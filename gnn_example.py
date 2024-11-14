@@ -32,24 +32,6 @@ model = GeneralGNN(data.n_labels, activation='softmax')
 optimizer = Adam(learning_rate=learning_rate)
 loss_function = CategoricalCrossentropy()
 
-class MyGNN(Model):
-    def __init__(self, n_hidden, n_labels):
-        super().__init__()
-        self.graph_conv = GCNConv(n_hidden)
-        self.pool = GlobalSumPool()
-        self.dropout = Dropout(0.5)
-        self.dense = Dense(n_labels, 'softmax')
-
-    def call(self, inputs):
-        out = self.graph_conv(inputs)
-        out = self.dropout(out)
-        out = self.pool(out)
-        out = self.dense(out)
-
-        return out
-
-model = MyGNN(n_hidden=32, n_labels=data.n_labels)
-model.compile('adam', 'categorical_crossentropy')
 
 @tf.function(input_signature=loader_train.tf_signature(), experimental_relax_shapes=True)
 def train_step(input, targets):
