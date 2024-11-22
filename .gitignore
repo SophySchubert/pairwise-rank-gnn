@@ -1,5 +1,6 @@
-# ignore all logging-files
-*.log
+# ignore all experiments
+experiment/
+src/temp.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

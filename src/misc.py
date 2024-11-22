@@ -1,8 +1,11 @@
+import json
 import os
 import logging
 from datetime import datetime
+from shutil import copyfile
 
-def setup_logger(path='./', lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)s - %(message)s"):
+
+def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)s - %(message)s"):
     """
     Sets up a global logger accessible via logging.getLogger("root").
     The registered logger will stream its outputs to the console as well as
@@ -37,3 +40,16 @@ def setup_logger(path='./', lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)
 
 def now():
     return datetime.now()
+
+def read_config(path: str):
+    with open(path, "r") as config:
+        return json.load(config)
+
+def setup_experiment(path: str):
+    config = read_config(path)
+    experiment_path = os.path.join(".", config['folder_path'], now().strftime("%Y-%m-%d-%H-%M-%S"))
+    os.makedirs(experiment_path)
+    config['folder_path'] = experiment_path
+    copyfile(path, experiment_path+"/config.json")
+
+    return config
