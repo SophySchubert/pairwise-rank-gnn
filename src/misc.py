@@ -4,6 +4,9 @@ import logging
 from datetime import datetime
 from shutil import copyfile
 
+from models.prgnn import PRGNN
+from models.general_gnn import GeneralGNN
+
 
 def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)s - %(message)s"):
     """
@@ -37,6 +40,14 @@ def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)
     root_logger.addHandler(console_handler)
 
     return root_logger
+
+def setup_model(model_name, n_labels, config=None):
+    if model_name == 'general_gnn':
+        return GeneralGNN(n_labels, activation="softmax")
+    elif model_name == 'prgnn':
+        return PRGNN(hidden=config['hidden_layers'], config=config)
+    else:
+        raise ValueError(f"Model {model_name} unknown")
 
 def now():
     return datetime.now()

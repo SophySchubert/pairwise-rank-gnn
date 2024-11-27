@@ -4,14 +4,14 @@ import numpy as np
 from tensorflow.keras.metrics import categorical_accuracy
 from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
+import time
 
-from misc import setup_experiment, setup_logger, now
+from misc import setup_experiment, setup_logger, now, setup_model
 from data.load import split_data
-from models.general_gnn import GeneralGNN
-from models.prgnn import PRGNN
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     physical_devices = tf.config.list_physical_devices("GPU")
     if len(physical_devices) > 0:
         tf.config.experimental.set_memory_growth(physical_devices[0], True)
@@ -26,16 +26,19 @@ if __name__ == "__main__":
     tf.random.set_seed(config['seed'])
 
     # Load data and split it in train and test sets
-    loader_train, loader_test, n_labels = split_data(config)
+    try:
+        loader_train, loader_test, n_labels = split_data(config)
+    except ValueError as e:
+        logger.error(e)
+        sys.exit(e)
 
     # Initialize the model, optimizer, and loss function
-    model = None
-    if config['model'] == 'general_gnn':
-        model = GeneralGNN(n_labels, activation="softmax")
-    elif config['model'] == 'prgnn':
-        model = PRGNN(hidden=config['hidden_layers'], config=config)
-    else:
-        raise ValueError(f"Unknown model: {config['model']}")
+    try:
+        model = setup_model(config, n_labels)
+    except ValueError as e:
+        logger.error(e)
+        sys.exit(e)
+
     optimizer = Adam(learning_rate=config['learning_rate'])
     loss_function = CategoricalCrossentropy()
 
@@ -132,6 +135,8 @@ if __name__ == "__main__":
     else:
         results_test = evaluate(loader_test)
     logger.info("Final results - Loss: {:.3f} - Acc: {:.3f}".format(*results_test))
+
+    logger.info("--- %s seconds ---" % (time.time() - start_time))
 
 
 
