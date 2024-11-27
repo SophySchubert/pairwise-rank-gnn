@@ -1,11 +1,12 @@
 {
   "folder_path": "experiment",
-  "epochs": 400,
+  "epochs": 10,
   "batch_size": 32,
   "learning_rate": 0.001,
   "network": "GCN",
   "dataset": "PROTEINS",
   "seed": 42,
   "train_test_split": 0.8,
-  "hidden_layers": 32
+  "hidden_layers": 4,
+  "pairwise": 1
 }
