@@ -45,7 +45,7 @@ def setup_model(model_name, n_labels, config=None):
     if model_name == 'general_gnn':
         return GeneralGNN(n_labels, activation="softmax")
     elif model_name == 'prgnn':
-        return PRGNN(hidden=config['hidden_layers'], config=config)
+        return PRGNN(config=config)
     else:
         raise ValueError(f"Model {model_name} unknown")
 

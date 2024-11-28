@@ -1,6 +1,7 @@
 import networkx as nx
-from node2vec import Node2Vec
+import numpy as np
 import pickle
+from node2vec import Node2Vec
 
 
 def spektral_to_networkx(spektral_graph):
@@ -13,7 +14,12 @@ def spektral_to_networkx(spektral_graph):
 
     return nx_graph
 
-def graph2embedding():
+def graph_to_embedding():
+    from node2vec import Node2Vec
+    '''
+    uses node2vec's algorithm
+    :return:
+    '''
     # TODO: expand to work with real dataset
     EMBEDDING_FILENAME = "temp.txt"
     EMBEDDING_MODEL_FILENAME = "temp.emb"
@@ -35,6 +41,21 @@ def graph2embedding():
     # Save model for later use
     # model.save(EMBEDDING_MODEL_FILENAME)
 
+def graph_to_feature_vector(graph):
+    # Initialize Node2Vec model
+    node2vec = Node2Vec(graph, dimensions=64, walk_length=30, num_walks=200, workers=4)
+
+    # Fit the model to generate embeddings
+    model = node2vec.fit(window=10, min_count=1, batch_words=4)
+
+    # Get embeddings for all nodes
+    embeddings = np.array([model.wv[str(node)] for node in graph.nodes()])
+
+    # Aggregate node embeddings to form a single feature vector for the graph
+    feature_vector = np.mean(embeddings, axis=0)
+
+    return feature_vector
+
 def saveGraph(graph):
     with open("temp.p", "wb") as f:
         pickle.dump(graph, f)
@@ -42,3 +63,6 @@ def saveGraph(graph):
 def loadGraph(name:'temp.p'):
     with open("temp.p", "rb") as f:
         return pickle.load(f)
+
+if "name" == "__main__":
+    pass
