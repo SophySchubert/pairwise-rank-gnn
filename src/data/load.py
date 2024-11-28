@@ -29,7 +29,7 @@ def split_data(config):
     test_data = data[train_size:]
     n_labels = train_data.n_labels
 
-    loader_train = DisjointLoader(train_data, batch_size=config['batch_size'])
+    loader_train = DisjointLoader(train_data, batch_size=config['batch_size'], epochs=config['epochs'])
     loader_test = DisjointLoader(test_data, batch_size=config['batch_size'])
 
     return loader_train, loader_test, n_labels
