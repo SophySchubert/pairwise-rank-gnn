@@ -1,5 +1,5 @@
-# Pairwise Ranking GNN
-This repository contains the code for the paper "Pairwise Ranking Graph Neural Networks" by [Johannes Klicpera](https://johannesklicpera.com), [Stefan Weißenberger](https://stefanweissenberger.com), and [Stephan Günnemann](https://www.in.tum.de/daml/people/guennemann/).
+# Pariwise ranking GNN
+This repo contains the code from my masters thesis: "Imporving pairwise ranking problems with graph neural networks".
 
 ## Installation
 ```bash

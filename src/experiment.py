@@ -17,7 +17,6 @@ if __name__ == "__main__":
         tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
     config = setup_experiment(sys.argv[1])
-
     logger = setup_logger(config['folder_path'])
 
     logger.info(f"Starting at {now()}")
