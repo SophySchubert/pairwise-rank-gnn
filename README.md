@@ -1,4 +1,5 @@
-# Pairwise Ranking GNN
+# Pariwise ranking GNN
+This repo contains the code from my masters thesis: "Imporving pairwise ranking problems with graph neural networks".
 
 ## Installation
 ```bash

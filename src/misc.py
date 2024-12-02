@@ -1,6 +1,6 @@
-import json
 import os
 import logging
+from yaml import load
 from datetime import datetime
 from shutil import copyfile
 
@@ -54,7 +54,7 @@ def now():
 
 def read_config(path: str):
     with open(path, "r") as config:
-        return json.load(config)
+        return load(config)
 
 def setup_experiment(path: str):
     config = read_config(path)
