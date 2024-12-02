@@ -1,8 +1,15 @@
 # Pairwise Ranking GNN
+This repository contains the code for the paper "Pairwise Ranking Graph Neural Networks" by [Johannes Klicpera](https://johannesklicpera.com), [Stefan Weißenberger](https://stefanweissenberger.com), and [Stephan Günnemann](https://www.in.tum.de/daml/people/guennemann/).
 
 ## Installation
 ```bash
-pip install -r requirements.txt
+#for experiments
+sh experiment.sh
+```
+
+```bash
+#for convertion from nodes to vectors and visualtization
+sh convertion.sh
 ```
 
 ## Usage
