@@ -1,6 +1,6 @@
 import os
 import logging
-from yaml import load
+from yaml import Loader, load
 from datetime import datetime
 from shutil import copyfile
 
@@ -58,7 +58,7 @@ def now():
 
 def read_config(path: str):
     with open(path, "r") as config:
-        return load(config)
+        return load(config, Loader=Loader)
 
 def setup_experiment(path: str):
     config = read_config(path)

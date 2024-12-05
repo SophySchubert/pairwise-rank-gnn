@@ -1,7 +1,7 @@
 import numpy as np
 from spektral.datasets import TUDataset
 from spektral.data import DisjointLoader
-from ogb.graphproppred import PygGraphPropPredDataset
+# from ogb.graphproppred import PygGraphPropPredDataset
 
 def _load_data(name: str):
     '''
@@ -12,7 +12,8 @@ def _load_data(name: str):
     if name in TUDataset.available_datasets():
         return TUDataset(name)
     elif name in _obg_available_datasets():
-        return PygGraphPropPredDataset(name=name, root='data/')
+        pass
+        # return PygGraphPropPredDataset(name=name, root='data/')
     else:
         raise ValueError(f'Dataset {name} unknown')
 
