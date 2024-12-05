@@ -1,0 +1,14 @@
+2024-12-05 12:29:45,308 - INFO - experiment - Starting at 2024-12-05 12:29:45.308974
+2024-12-05 12:29:45,308 - INFO - experiment - Experiment saved in .\experiment\2024-12-05-12-29-45
+2024-12-05 12:29:50,265 - INFO - experiment - Ep. 1 - Loss: 0.673 - Acc: 0.604 - Test loss: 2.170 - Test acc: 0.444
+2024-12-05 12:29:50,656 - INFO - experiment - Ep. 2 - Loss: 0.583 - Acc: 0.676 - Test loss: 0.672 - Test acc: 0.538
+2024-12-05 12:29:51,063 - INFO - experiment - Ep. 3 - Loss: 0.567 - Acc: 0.700 - Test loss: 0.699 - Test acc: 0.462
+2024-12-05 12:29:51,455 - INFO - experiment - Ep. 4 - Loss: 0.538 - Acc: 0.724 - Test loss: 0.627 - Test acc: 0.655
+2024-12-05 12:29:51,862 - INFO - experiment - Ep. 5 - Loss: 0.531 - Acc: 0.729 - Test loss: 0.566 - Test acc: 0.691
+2024-12-05 12:29:52,253 - INFO - experiment - Ep. 6 - Loss: 0.509 - Acc: 0.761 - Test loss: 0.519 - Test acc: 0.767
+2024-12-05 12:29:52,645 - INFO - experiment - Ep. 7 - Loss: 0.514 - Acc: 0.746 - Test loss: 0.568 - Test acc: 0.673
+2024-12-05 12:29:53,052 - INFO - experiment - Ep. 8 - Loss: 0.502 - Acc: 0.761 - Test loss: 0.540 - Test acc: 0.717
+2024-12-05 12:29:53,459 - INFO - experiment - Ep. 9 - Loss: 0.497 - Acc: 0.768 - Test loss: 0.605 - Test acc: 0.655
+2024-12-05 12:29:53,897 - INFO - experiment - Ep. 10 - Loss: 0.509 - Acc: 0.752 - Test loss: 0.511 - Test acc: 0.767
+2024-12-05 12:29:53,991 - INFO - experiment - Final results - Loss: 0.511 - Acc: 0.767
+2024-12-05 12:29:53,991 - INFO - experiment - --- 8.713520288467407 seconds ---
