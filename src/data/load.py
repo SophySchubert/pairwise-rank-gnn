@@ -1,41 +1,123 @@
 import numpy as np
-from spektral.datasets import TUDataset
-from spektral.data import DisjointLoader
-# from ogb.graphproppred import PygGraphPropPredDataset
+
+from spektral.datasets import TUDataset, QM9
+from data.ogb_helper import OGBDataset, ogb_available_datasets
+
 
 def _load_data(name: str):
     '''
     Loads a dataset from [TUDataset, OGB]
-    TODO: Add more datasets
     '''
 
-    if name in TUDataset.available_datasets():
-        return TUDataset(name)
-    elif name in _obg_available_datasets():
-        pass
-        # return PygGraphPropPredDataset(name=name, root='data/')
+    if name == 'QM9':
+        dataset = QM9(amount=100000)# 1000 and 100000 ok
+    elif name in TUDataset.available_datasets():
+        dataset = TUDataset(name)
+    elif name in ogb_available_datasets():
+        dataset = OGBDataset(name)
     else:
         raise ValueError(f'Dataset {name} unknown')
 
+    return dataset, dataset.n_labels
 
-def split_data(config):
-    # TODO: Split into two training points/graphs
-    np.random.seed(config['seed'])
+def _sample_pairs(dataset):
+    '''
+    Sample pairs of graphs from a dataset
+    '''
+    assert(len(dataset) % 2 == 0)
 
-    data = _load_data(config['dataset'])
-    np.random.shuffle(data)
+    _pair_a = dataset[::2]
+    _pair_b = dataset[1::2]
 
-    # Split the dataset into train and test sets
-    train_size = int(len(data) * config['train_test_split'])
-    train_data = data[:train_size]
-    test_data = data[train_size:]
-    n_labels = train_data.n_labels
+    return list(zip(_pair_a, _pair_b))
 
-    loader_train = DisjointLoader(train_data, batch_size=config['batch_size'], epochs=config['epochs'])
-    loader_test = DisjointLoader(test_data, batch_size=config['batch_size'])
+def _split_data(data, train_test_split, seed):
+    '''
+    Split the data into train and test sets
+    https://github.com/KIuML/PLR_SS22/blob/master/exercise_07.ipynb ?
+    '''
+    np.random.seed(seed)
+    idxs = np.random.permutation(len(data))
+    split = int(train_test_split * len(data))
+    idx_train, idx_test = np.split(idxs, [split])
+    train, test = data[idx_train], data[idx_test]
 
-    return loader_train, loader_test, n_labels
+    return train, test
+
+def get_data(config):
+    seed = config['seed']
+    train_test_split = config['train_test_split']
+    name = config['dataset']
+    pairwise = config['pairwise']
+
+    # Load data
+    data, n_out = _load_data(name)
+    config['n_out'] = n_out
+    # Split data
+    train_data, test_data = _split_data(data, train_test_split, seed)
+    # Create pairs
+    if pairwise:
+        train_data = _sample_pairs(train_data)
+        test_data = _sample_pairs(test_data)
+
+    return train_data, test_data
 
 
-def _obg_available_datasets():
-    return ['ogbg-molbace', 'ogbg-molbbbp', 'ogbg-molclintox', 'ogbg-molmuv', 'ogbg-molpcba', 'ogbg-molsider', 'ogbg-moltox21', 'ogbg-moltoxcast', 'ogbg-molhiv', 'ogbg-molesol', 'ogbg-molfreesolv', 'ogbg-mollipo', 'ogbg-molchembl', 'ogbg-ppa', 'ogbg-code2']
+
+
+
+if __name__ == "__main__":
+    pass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
