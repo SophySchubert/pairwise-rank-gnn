@@ -4,22 +4,9 @@ seed: 42
 epochs: 10
 batch_size: 32
 learning_rate: 0.001
-network: general_gnn
-dataset: ogbg-molhiv
+model: prgnn # general_gnn, direct_ranker, prgnn
+dataset: ogbg-mollipo #JA: QM9, ogbg-molesol, molfreesolv, ogbg-mollipo, ZINC| NEIN: aspirin
 train_test_split: 0.8
 hidden_layers: 4
 convolution_neurons: 128
-pairwise: 1
-
-
-
-
-
-
-
-
-
-
-
-
-
+pairwise: 0

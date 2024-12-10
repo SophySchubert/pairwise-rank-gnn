@@ -1,15 +1,17 @@
 import os
 import logging
+
+from spektral.data.utils import prepend_none, to_tf_signature
 from yaml import Loader, load
 from datetime import datetime
 from shutil import copyfile
 
 from models.prgnn import PRGNN
-from models.general_gnn import GeneralGNN
-from models.DirektRanker import DirectRanker
+from models.general_gnn import Net
+from models.DirectRanker import DirectRanker
+import pickle
 
-
-def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)s - %(message)s"):
+def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(message)s"):
     """
     Sets up a global logger accessible via logging.getLogger("root").
     The registered logger will stream its outputs to the console as well as
@@ -42,14 +44,14 @@ def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)
 
     return root_logger
 
-def setup_model(config, n_labels):
+def setup_model(config):
     model_name = config['model']
     if model_name == 'general_gnn':
-        return GeneralGNN(n_labels, activation="softmax")
+        return Net(config=config)
     elif model_name == 'prgnn':
         return PRGNN(config=config)
     elif model_name == 'direct_ranker':
-        return DirectRanker()
+        return DirectRanker(config=config)
     else:
         raise ValueError(f"Model {model_name} unknown")
 
@@ -69,6 +71,7 @@ def setup_experiment(path: str):
 
     return config
 
-def log_analyzer():
-    # TODO: Implement a method to get test loss and accuracy from log file for plotting
-    pass
+def save_history(history, path):
+    with open(path+"/trainHistory", "wb") as f:
+        pickle.dump(history.history, f)
+
