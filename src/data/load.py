@@ -42,7 +42,7 @@ def _split_data(data, train_test_split, seed):
     idx_train, idx_test = np.split(idxs, [split])
     train, test = data[idx_train], data[idx_test]
 
-    return train, test
+data    return {'data':train, 'idx':[1,2,3]}, {'data':test, 'idx':[1,2,3]}
 
 def get_data(config):
     seed = config['seed']
@@ -67,7 +67,24 @@ def get_data(config):
 
 
 if __name__ == "__main__":
-    pass
+    import tensorflow as tf
+    from spektral.data import Graph
+
+    # Example graph object
+    graph = Graph(x=[[1, 2], [3, 4]], a=[[0, 1], [1, 0]], e=[[0.5], [0.5]])
+
+    # Convert node features to tensor
+    x_tensor = tf.convert_to_tensor(graph.x, dtype=tf.float32)
+
+    # Convert adjacency matrix to tensor
+    a_tensor = tf.convert_to_tensor(graph.a, dtype=tf.float32)
+
+    # Convert edge features to tensor (if available)
+    e_tensor = tf.convert_to_tensor(graph.e, dtype=tf.float32) if graph.e is not None else None
+
+    print("Node features tensor:", x_tensor)
+    print("Adjacency matrix tensor:", a_tensor)
+    print("Edge features tensor:", e_tensor)
 
 
 
