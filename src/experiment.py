@@ -28,6 +28,8 @@ if __name__ == '__main__':
 
     # Load data and split it in train and test sets
     train_data, test_data = get_data(config)
+    train_y = [(tuple[0].y, tuple[1].y) for tuple in train_data]
+    test_y = [(tuple[0].y, tuple[1].y) for tuple in test_data]
 
     # Initialize the model, optimizer, and loss function
     model = setup_model(config)
@@ -38,8 +40,9 @@ if __name__ == '__main__':
     ################################################################################
     # Fit model
     ################################################################################
-    loader_train = BatchLoader(train_data, batch_size=config['batch_size'], mask=True)
-    h = model.fit(loader_train.load(), steps_per_epoch=loader_train.steps_per_epoch, epochs=config['epochs'], verbose=2)
+    # loader_train = BatchLoader(train_data, batch_size=config['batch_size'], mask=True)
+    # h = model.fit(loader_train.load(), steps_per_epoch=loader_train.steps_per_epoch, epochs=config['epochs'], verbose=2)
+    h = model.fit(train_data, train_y, batch_size=config['batch_size'], epochs=config['epochs'], verbose=2)
     save_history(h, config['folder_path'])
     logger.info(f"Training done!")
     ################################################################################

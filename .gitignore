@@ -1,6 +1,7 @@
 # ignore all experiments
 experiment/
 src/temp.py
+dataset/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

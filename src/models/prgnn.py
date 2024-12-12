@@ -18,7 +18,11 @@ class PRGNN(tf.keras.Model):
         )
 
     def call(self, inputs):
-        x, a, e = inputs
+        graph1, graph2 = inputs[0], inputs[1]
+        print(graph1)
+        print(graph2)
+        exit(1)
+        x, a, e = graph1
         x = self.masking(x)
         x = self.conv1([x, a, e])
         x = self.conv2([x, a, e])

@@ -9,4 +9,4 @@ dataset: ogbg-mollipo #JA: QM9, ogbg-molesol, molfreesolv, ogbg-mollipo, ZINC| N
 train_test_split: 0.8
 hidden_layers: 4
 convolution_neurons: 128
-pairwise: 0
+pairwise: 1
