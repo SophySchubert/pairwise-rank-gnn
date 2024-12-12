@@ -29,7 +29,7 @@ def _sample_pairs(dataset):
     _pair_a = dataset[::2]
     _pair_b = dataset[1::2]
 
-    return tuple(zip(_pair_a, _pair_b))
+    return list(zip(_pair_a, _pair_b))
 
 def _split_data(data, train_test_split, seed):
     '''
