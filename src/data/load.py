@@ -1,5 +1,5 @@
 import numpy as np
-
+import tensorflow as tf
 from spektral.datasets import TUDataset, QM9
 from data.ogb_helper import OGBDataset, ogb_available_datasets
 
@@ -10,7 +10,7 @@ def _load_data(name: str):
     '''
 
     if name == 'QM9':
-        dataset = QM9(amount=100000)# 1000 and 100000 ok
+        dataset = QM9(amount=1000)# 1000 and 100000 ok
     elif name in TUDataset.available_datasets():
         dataset = TUDataset(name)
     elif name in ogb_available_datasets():
@@ -19,17 +19,6 @@ def _load_data(name: str):
         raise ValueError(f'Dataset {name} unknown')
 
     return dataset, dataset.n_labels
-
-def _sample_pairs(dataset):
-    '''
-    Sample pairs of graphs from a dataset
-    '''
-    assert(len(dataset) % 2 == 0)
-
-    _pair_a = dataset[::2]
-    _pair_b = dataset[1::2]
-
-    return list(zip(_pair_a, _pair_b))
 
 def _split_data(data, train_test_split, seed):
     '''
@@ -41,8 +30,25 @@ def _split_data(data, train_test_split, seed):
     split = int(train_test_split * len(data))
     idx_train, idx_test = np.split(idxs, [split])
     train, test = data[idx_train], data[idx_test]
+    return train, test
 
-data    return {'data':train, 'idx':[1,2,3]}, {'data':test, 'idx':[1,2,3]}
+def _sample_pairs(dataset):
+    '''
+    Sample pairs of graphs from a dataset
+    '''
+    assert(len(dataset) % 2 == 0)
+    len_dataset = len(dataset)
+    dataset = [d.y for d in dataset]
+    _pairs_even = dataset[::2]
+    _pairs_odd = dataset[1::2]
+    _pairs_even_ids = range(0, len_dataset, 2)
+    _pairs_odd_ids = range(1, len_dataset, 2)
+
+    data = list(zip(_pairs_even, _pairs_odd))
+    ids = list(zip(_pairs_even_ids, _pairs_odd_ids))
+    targets = [max(d) for d in data]
+
+    return ids, targets
 
 def get_data(config):
     seed = config['seed']
@@ -57,84 +63,7 @@ def get_data(config):
     train_data, test_data = _split_data(data, train_test_split, seed)
     # Create pairs
     if pairwise:
-        train_data = _sample_pairs(train_data)
-        test_data = _sample_pairs(test_data)
+        train_pairs, train_targets = _sample_pairs(train_data)
+        test_pairs, test_targets = _sample_pairs(test_data)
 
-    return train_data, test_data
-
-
-
-
-
-if __name__ == "__main__":
-    import tensorflow as tf
-    from spektral.data import Graph
-
-    # Example graph object
-    graph = Graph(x=[[1, 2], [3, 4]], a=[[0, 1], [1, 0]], e=[[0.5], [0.5]])
-
-    # Convert node features to tensor
-    x_tensor = tf.convert_to_tensor(graph.x, dtype=tf.float32)
-
-    # Convert adjacency matrix to tensor
-    a_tensor = tf.convert_to_tensor(graph.a, dtype=tf.float32)
-
-    # Convert edge features to tensor (if available)
-    e_tensor = tf.convert_to_tensor(graph.e, dtype=tf.float32) if graph.e is not None else None
-
-    print("Node features tensor:", x_tensor)
-    print("Adjacency matrix tensor:", a_tensor)
-    print("Edge features tensor:", e_tensor)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return train_data, train_pairs, train_targets, test_data, test_pairs, test_targets
