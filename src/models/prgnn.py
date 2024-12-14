@@ -18,15 +18,18 @@ class PRGNN(tf.keras.Model):
         )
 
     def call(self, inputs):
-        graph1, graph2 = inputs[0], inputs[1]
-        print(graph1)
-        print(graph2)
-        exit(1)
-        x, a, e = graph1
+        graph = inputs[0]
+        x, a, e = graph[0], graph[1], graph[2]
         x = self.masking(x)
         x = self.conv1([x, a, e])
         x = self.conv2([x, a, e])
         output = self.pool(x)
         output = self.dense(output)
+        X_a, X_b = self.pref_lookup(output, inputs[1], input[2])
 
-        return output
+        return X_a - X_b
+
+    def pref_lookup(self, X, pref_a, pref_b):
+        X_a = tf.gather(X, pref_a, axis=0)
+        X_b = tf.gather(X, pref_b, axis=0)
+        return X_a, X_b
