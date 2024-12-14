@@ -40,7 +40,7 @@ if __name__ == '__main__':
     model = setup_model(config)
     model.compile(optimizer=Adam(config['learning_rate']),
                                  loss=BinaryCrossentropy(from_logits=True),
-                                 metrics=[BinaryAccuracy(threshold=.0)])
+                                 metrics=[BinaryAccuracy(threshold=.5)])
 
     ################################################################################
     # Fit model
