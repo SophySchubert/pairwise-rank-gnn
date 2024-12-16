@@ -1,7 +1,8 @@
 import numpy as np
 import tensorflow as tf
-from spektral.datasets import TUDataset, QM9
-from data.ogb_helper import OGBDataset, ogb_available_datasets
+from spektral.datasets import TUDataset, QM9, OGB
+from ogb.graphproppred import Evaluator, GraphPropPredDataset
+from data.ogb_helper import ogb_available_datasets, OGBDataset
 
 
 def _load_data(name: str):
@@ -14,7 +15,9 @@ def _load_data(name: str):
     elif name in TUDataset.available_datasets():
         dataset = TUDataset(name)
     elif name in ogb_available_datasets():
-        dataset = OGBDataset(name)
+        # ogb_dataset = GraphPropPredDataset(name)
+        # dataset = OGB(ogb_dataset)
+        dataset= OGBDataset(name)
     else:
         raise ValueError(f'Dataset {name} unknown')
 
@@ -23,7 +26,6 @@ def _load_data(name: str):
 def _split_data(data, train_test_split, seed):
     '''
     Split the data into train and test sets
-    https://github.com/KIuML/PLR_SS22/blob/master/exercise_07.ipynb ?
     '''
     np.random.seed(seed)
     idxs = np.random.permutation(len(data))
@@ -46,7 +48,7 @@ def _sample_pairs(dataset):
 
     data = list(zip(_pairs_even, _pairs_odd))
     ids = list(zip(_pairs_even_ids, _pairs_odd_ids))
-    targets = [max(d) for d in data]
+    targets = [np.maximum(d[0], d[1]) for d in data]
 
     return ids, targets
 
@@ -57,11 +59,12 @@ def get_data(config):
     pairwise = config['pairwise']
 
     # Load data
-    data, n_out = _load_data(name)
-    config['n_out'] = n_out
+    data, config['n_out'] = _load_data(name)
     # Split data
     train_data, test_data = _split_data(data, train_test_split, seed)
     # Create pairs
+    train_pairs, train_targets = None, None,
+    test_pairs, test_targets = None, None
     if pairwise:
         train_pairs, train_targets = _sample_pairs(train_data)
         test_pairs, test_targets = _sample_pairs(test_data)

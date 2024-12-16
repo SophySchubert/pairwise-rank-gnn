@@ -1,6 +1,7 @@
 import os
 import logging
 
+from absl.logging import level_info
 from spektral.data.utils import prepend_none, to_tf_signature
 from yaml import Loader, load
 from datetime import datetime
@@ -11,7 +12,7 @@ from models.general_gnn import Net
 from models.DirectRanker import DirectRanker
 import pickle
 
-def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(message)s"):
+def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)s - %(message)s"):
     """
     Sets up a global logger accessible via logging.getLogger("root").
     The registered logger will stream its outputs to the console as well as

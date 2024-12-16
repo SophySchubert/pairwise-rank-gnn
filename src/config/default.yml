@@ -1,11 +1,14 @@
 ---
 folder_path: experiment
+logger:
+  level: 10 # CRITICAL = 50, ERROR = 40, WARNING = 30, INFO = 20, DEBUG = 10, NOTSET = 0
+  format: "%(asctime)s - %(levelname)s - %(message)s"
 seed: 42
 epochs: 10
 batch_size: 32
 learning_rate: 0.001
 model: prgnn # general_gnn, direct_ranker, prgnn
-dataset: ogbg-mollipo #JA: QM9, ogbg-molesol, molfreesolv, ogbg-mollipo, ZINC| NEIN: aspirin
+dataset: ogbg-molesol #JA: QM9, ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC| NEIN: aspirin
 train_test_split: 0.8
 hidden_layers: 4
 convolution_neurons: 128
