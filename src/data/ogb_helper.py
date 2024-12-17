@@ -27,8 +27,7 @@ class OGBDataset(Dataset):
                 adj[edge[0], edge[1]] = 1
 
             # Create spektral Graph object
-            graph = Graph(x=node_feat, a=adj, e=edge_feat, y=label)
-            graphs.append(graph)
+            graphs.append(Graph(x=node_feat, a=adj, e=edge_feat, y=label))
 
         return graphs
 

@@ -28,8 +28,8 @@ if __name__ == '__main__':
 
     # Load data and split it in train and test sets
     train_graphs, train_pairs, train_y, test_graphs, test_pairs, test_y = get_data(config)
-    loader_tr = DisjointLoader(train_graphs, batch_size=config['batch_size'], epochs=config['epochs'])
-    loader_te = DisjointLoader(test_graphs, batch_size=config['batch_size'], epochs=1)
+    loader_tr = BatchLoader(train_graphs, batch_size=config['batch_size'], epochs=config['epochs'])
+    loader_te = BatchLoader(test_graphs, batch_size=config['batch_size'], epochs=1)
 
     model = setup_model(config)
     # model.compile(optimizer=Adam(config['learning_rate']),

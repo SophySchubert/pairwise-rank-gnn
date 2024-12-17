@@ -40,15 +40,26 @@ def _sample_pairs(dataset):
     '''
     assert(len(dataset) % 2 == 0)
     len_dataset = len(dataset)
-    dataset = [d.y for d in dataset]
-    _pairs_even = dataset[::2]
-    _pairs_odd = dataset[1::2]
+    dataset_targets = [d.y for d in dataset]
+    _pairs_even = dataset_targets[::2]
+    _pairs_odd = dataset_targets[1::2]
     _pairs_even_ids = range(0, len_dataset, 2)
     _pairs_odd_ids = range(1, len_dataset, 2)
 
     data = list(zip(_pairs_even, _pairs_odd))
-    ids = list(zip(_pairs_even_ids, _pairs_odd_ids))
+    ids = np.array(list(zip(_pairs_even_ids, _pairs_odd_ids)))
     targets = [np.maximum(d[0], d[1]) for d in data]
+
+    # ids = np.array(ids, dtype=np.int64)
+    # targets = np.array(targets, dtype=np.int64)
+    # print(ids.dtype)
+    # print(targets.dtype)
+
+    for i, tuple in enumerate(ids):
+        dataset[tuple[0]].pair = tuple
+        dataset[tuple[0]].pair_target = targets[i]
+        dataset[tuple[1]].pair = tuple
+        dataset[tuple[1]].pair_target = targets[i]
 
     return ids, targets
 
