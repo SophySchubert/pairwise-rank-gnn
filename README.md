@@ -1,15 +1,9 @@
-# Pariwise ranking GNN
-This repo contains the code from my masters thesis: "Imporving pairwise ranking problems with graph neural networks".
+# Pairwise ranking GNN
+This repo contains the code from my masters thesis: "Improving pairwise ranking problems with graph neural networks".
 
 ## Installation
 ```bash
-#for experiments
-sh experiment.sh
-```
-
-```bash
-#for convertion from nodes to vectors and visualtization
-sh convertion.sh
+pip install -r requirements.txt
 ```
 
 ## Usage
