@@ -32,5 +32,5 @@ class OGBDataset(Dataset):
         return graphs
 
 def ogb_available_datasets():
-    #Datasets have size % 2 == 0 number of graphs
+    #These regression datasets have size % 2 == 0 number of graphs
     return ['ogbg-molesol', 'ogbg-molfreesolv', 'ogbg-mollipo']

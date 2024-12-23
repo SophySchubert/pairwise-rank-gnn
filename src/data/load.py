@@ -1,22 +1,18 @@
 import numpy as np
-import tensorflow as tf
-from spektral.datasets import TUDataset, QM9, OGB
-from ogb.graphproppred import Evaluator, GraphPropPredDataset
-from data.ogb_helper import ogb_available_datasets, OGBDataset
+from spektral.datasets import TUDataset, QM9
+
+from src.data.ogb_helper import ogb_available_datasets, OGBDataset
 
 
 def _load_data(name: str):
     '''
     Loads a dataset from [TUDataset, OGB]
     '''
-
     if name == 'QM9':
         dataset = QM9(amount=1000)# 1000 and 100000 ok
     elif name in TUDataset.available_datasets():
         dataset = TUDataset(name)
     elif name in ogb_available_datasets():
-        # ogb_dataset = GraphPropPredDataset(name)
-        # dataset = OGB(ogb_dataset)
         dataset= OGBDataset(name)
     else:
         raise ValueError(f'Dataset {name} unknown')

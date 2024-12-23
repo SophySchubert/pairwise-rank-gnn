@@ -1,9 +1,7 @@
-from tensorflow.keras import Model
-from tensorflow.keras.layers import Dense
-
 import tensorflow as tf
-from spektral.layers import GlobalSumPool, ECCConv
 from tensorflow import keras
+from tensorflow.keras.layers import Dense
+from spektral.layers import GlobalSumPool, ECCConv
 
 
 class PRGNN(tf.keras.Model):

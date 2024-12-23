@@ -1,8 +1,6 @@
 import os
 import logging
-
-from absl.logging import level_info
-from spektral.data.utils import prepend_none, to_tf_signature
+import pickle
 from yaml import Loader, load
 from datetime import datetime
 from shutil import copyfile
@@ -10,7 +8,6 @@ from shutil import copyfile
 from models.prgnn import PRGNN
 from models.general_gnn import Net
 from models.DirectRanker import DirectRanker
-import pickle
 
 def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)s - %(message)s"):
     """

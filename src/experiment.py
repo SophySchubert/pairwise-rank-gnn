@@ -1,14 +1,14 @@
 import sys
-import tensorflow as tf
+import time
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from keras.losses import BinaryCrossentropy, MeanSquaredError
 from keras.metrics import BinaryAccuracy
-import time
-from misc import setup_experiment, setup_logger, now, setup_model, save_history
-from data.load import get_data
 
-from data.mydata import MyDisjointLoader
+from misc import setup_experiment, setup_logger, now, setup_model
+from data.load import get_data
+from data.misc import MyDisjointLoader
 
 if __name__ == '__main__':
     start_time = time.time()
