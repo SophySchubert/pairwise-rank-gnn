@@ -1,7 +1,7 @@
 import numpy as np
 from spektral.datasets import TUDataset, QM9
 
-from src.data.ogb_helper import ogb_available_datasets, OGBDataset
+from data.ogb_helper import ogb_available_datasets, OGBDataset
 
 
 def _load_data(name: str):

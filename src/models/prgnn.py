@@ -10,9 +10,9 @@ class PRGNN(tf.keras.Model):
         self.conv1 = ECCConv(32, activation="relu")
         self.conv2 = ECCConv(32, activation="relu")
         self.global_pool = GlobalSumPool()
-        self.dense = Dense(config['n_out'])
-        self.pref_a = keras.Input(shape=(), dtype=tf.float32)
-        self.pref_b = keras.Input(shape=(), dtype=tf.float32)
+        self.dense = Dense(config['n_out'], activation='relu')
+        self.pref_a = keras.Input(shape=(), dtype=tf.int32)
+        self.pref_b = keras.Input(shape=(), dtype=tf.int32)
 
         # self.compile(
         #     optimizer=keras.optimizers.Adam(config['learning_rate']),
@@ -33,10 +33,10 @@ class PRGNN(tf.keras.Model):
         # print(f"idx_b: {inputs[2]}")
         # print("call")
         x, a, e, i, idx_a, idx_b = inputs
-        # x = tf.cast(x, tf.float32)
-        # a = tf.cast(a, tf.float32)
-        # e = tf.cast(e, tf.float32)
-        # i = tf.cast(i, tf.int32)
+        x = tf.cast(x, tf.int32)
+        a = tf.cast(a, tf.int32)
+        e = tf.cast(e, tf.int32)
+        i = tf.cast(i, tf.int32)
         # idx_a = tf.cast(idx_a, tf.float32)
         # idx_b = tf.cast(idx_b, tf.float32)
 

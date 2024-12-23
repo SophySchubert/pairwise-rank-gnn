@@ -143,16 +143,16 @@ class MyDisjointLoader(DisjointLoader):
         signature["i"] = dict()
         signature["i"]["spec"] = tf.TensorSpec
         signature["i"]["shape"] = (None,)
-        signature["i"]["dtype"] = tf.as_dtype(tf.int64)
+        signature["i"]["dtype"] = tf.as_dtype(tf.int32)
 
         signature["idx_a"] = dict()
         signature["idx_a"]["spec"] = tf.TensorSpec
         signature["idx_a"]["shape"] = (None,)
-        signature["idx_a"]["dtype"] = tf.as_dtype(tf.int64)
+        signature["idx_a"]["dtype"] = tf.as_dtype(tf.int32)
         signature["idx_b"] = dict()
         signature["idx_b"]["spec"] = tf.TensorSpec
         signature["idx_b"]["shape"] = (None,)
-        signature["idx_b"]["dtype"] = tf.as_dtype(tf.int64)
+        signature["idx_b"]["dtype"] = tf.as_dtype(tf.int32)
 
         return to_tf_signature(signature)
 
@@ -165,9 +165,9 @@ class MyDisjointLoader(DisjointLoader):
         rnd = np.random.default_rng(seed)
         for part in parts:
             rnd.shuffle(part)
-        idx_a = np.empty((sample_size,), dtype=np.int64)
-        idx_b = np.empty((sample_size,), dtype=np.int64)
-        target = np.ones((sample_size,), dtype=np.int64)
+        idx_a = np.empty((sample_size,), dtype=np.int32)
+        idx_b = np.empty((sample_size,), dtype=np.int32)
+        target = np.ones((sample_size,), dtype=np.int32)
         k = 0
         for i in range(size):
             part = parts[i]
