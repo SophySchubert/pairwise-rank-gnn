@@ -2,12 +2,13 @@ import sys
 import tensorflow as tf
 import numpy as np
 from tensorflow.keras.optimizers import Adam
-from keras.losses import BinaryCrossentropy
+from keras.losses import BinaryCrossentropy, MeanSquaredError
 from keras.metrics import BinaryAccuracy
 import time
 from misc import setup_experiment, setup_logger, now, setup_model, save_history
 from data.load import get_data
-from spektral.data import BatchLoader
+
+from data.mydata import MyDisjointLoader
 
 if __name__ == '__main__':
     start_time = time.time()
@@ -28,65 +29,74 @@ if __name__ == '__main__':
 
     # Load data and split it in train and test sets
     train_graphs, train_pairs, train_y, test_graphs, test_pairs, test_y = get_data(config)
-    # print(type(train_graphs))
-    # print(train_graphs[0])
-    # print(type(train_pairs))
-    # print(train_pairs[0])
-    # print(type(train_y))
-    # print(train_y[0:31])
-    # exit(1)
+    loader_tr = MyDisjointLoader(train_graphs, batch_size=config['batch_size'], epochs=config['epochs'], seed=config['seed'])
+    loader_te = MyDisjointLoader(test_graphs, batch_size=config['batch_size'], epochs=1, seed=config['seed'])
 
-    # Initialize the model, optimizer, and loss function
     model = setup_model(config)
     model.compile(optimizer=Adam(config['learning_rate']),
                                  loss=BinaryCrossentropy(from_logits=True),
                                  metrics=[BinaryAccuracy(threshold=.5)])
+    optimizer = Adam(config['learning_rate'])
+    loss_fn = MeanSquaredError()
+
 
     ################################################################################
     # Fit model
     ################################################################################
-    # loader_train = BatchLoader(train_graphs, batch_size=config['batch_size'], mask=True, shuffle=False)
-    # i=0
-    # for epoch in range(config['epochs']):
-    #     print(epoch)
-    #     for batch in loader_train.load():
-    #         i+=1
-    #         # print(len(batch[1]))
-    #         # print(batch[1])
-    #         # exit(1)
-    # print(i)
-    # exit(1)
-    # h = model.fit(loader_train.load(), steps_per_epoch=loader_train.steps_per_epoch, epochs=config['epochs'], verbose=2)
-
-    train_graphs_x = [graph.x for graph in train_graphs]
-    train_graphs_a = [graph.a for graph in train_graphs]
-    train_graphs_e = [graph.e for graph in train_graphs]
-    train_data = list(zip(train_graphs_x, train_graphs_a, train_graphs_e))
-    ragged_train_data = tf.ragged.constant(train_data)
-    test_graphs_x = [graph.x for graph in test_graphs]
-    test_graphs_a = [graph.a for graph in test_graphs]
-    test_graphs_e = [graph.e for graph in test_graphs]
-    test_data = list(zip(test_graphs_x, test_graphs_a, test_graphs_e))
-    ragged_test_data = tf.ragged.constant(test_data)
-
-    train_pair_a = [pair[0] for pair in train_pairs]
-    train_pair_b = [pair[1] for pair in train_pairs]
-    test_pair_a = [pair[0] for pair in test_pairs]
-    test_pair_b = [pair[1] for pair in test_pairs]
+    @tf.function(input_signature=loader_tr.tf_signature(), experimental_relax_shapes=True)
+    def train_step(inputs, target):
+        print("train_step")
+        # print(f"len(inputs): {len(inputs)}")
+        # print(f"inputs: {inputs}")
+        # print(f"x: {inputs[0][0]}")
+        # print(f"a: {inputs[0][1]}")
+        # print(f"e: {inputs[0][2]}")
+        # print(f"i: {inputs[0][3]}")
+        # print(f"idx_a: {inputs[1]}")
+        # print(f"idx_b: {inputs[2]}")
+        # print(f"target: {target}")
+        # print("train_step")
+        with tf.GradientTape() as tape:
+            predictions = model(inputs, training=True)
+            loss = loss_fn(target, predictions) + sum(model.losses)
+        gradients = tape.gradient(loss, model.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+        return loss
 
 
-    train = tf.data.Dataset.from_tensors(((ragged_train_data, train_pair_a, train_pair_b), train_y))
-    test = tf.data.Dataset.from_tensors(((ragged_test_data, test_pair_a, test_pair_b), test_y))
+    step = loss = 0
+    for batch in loader_tr:#batch[0]==axei, batch[1]==idx_a, batch[2]==idx_b, batch[3]==target
+        step += 1
+        print("batch in loader_tr")
+        # print(f"len(batch): {len(batch)}")
+        # print(f"len(inputs): {len(batch[0])}")
+        # print(f"inputs: {batch[0]}")
+        # print(f"x: {batch[0][0][0]}")
+        # print(f"a: {batch[0][0][1]}")
+        # print(f"e: {batch[0][0][2]}")
+        # print(f"i: {batch[0][0][3]}")
+        # print(f"idx_a: {batch[0][1]}")
+        # print(f"idx_b: {batch[0][2]}")
+        # print(f"target: {batch[1]}")
+        # print("batch in loader_tr")
 
-    h = model.fit(train,
-                  validation_data=test,
-                  batch_size=config['batch_size'],
-                  epochs=config['epochs'],
-                  verbose=2)
+        loss += train_step(*batch)
+        if step == loader_tr.steps_per_epoch:
+            step = 0
+            print("Loss: {}".format(loss / loader_tr.steps_per_epoch))
+            loss = 0
 
-    save_history(h, config['folder_path'])
-    logger.info(f"Training done!")
     ################################################################################
+    # Evaluate model
+    ################################################################################
+    print("Testing model")
+    loss = 0
+    for batch in loader_te:
+        inputs, target = batch
+        predictions = model(inputs, training=False)
+        loss += loss_fn(target, predictions)
+    loss /= loader_te.steps_per_epoch
+    print("Done. Test loss: {}".format(loss))
 
 
     logger.info("--- %s seconds ---" % (time.time() - start_time))

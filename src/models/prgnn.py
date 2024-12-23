@@ -1,17 +1,20 @@
+from tensorflow.keras import Model
+from tensorflow.keras.layers import Dense
+
 import tensorflow as tf
-from spektral.layers import GeneralConv, GlobalSumPool, GraphMasking, ECCConv
+from spektral.layers import GlobalSumPool, ECCConv
 from tensorflow import keras
+
 
 class PRGNN(tf.keras.Model):
     def __init__(self, config):
-        super(PRGNN, self).__init__()
-        self.masking = GraphMasking()
+        super().__init__()
         self.conv1 = ECCConv(32, activation="relu")
         self.conv2 = ECCConv(32, activation="relu")
-        # self.conv1 = GeneralConv(32, activation="relu")
-        # self.conv2 = GeneralConv(32, activation="relu")
         self.global_pool = GlobalSumPool()
-        self.dense = keras.layers.Dense(1, activation="relu")
+        self.dense = Dense(config['n_out'])
+        self.pref_a = keras.Input(shape=(), dtype=tf.float32)
+        self.pref_b = keras.Input(shape=(), dtype=tf.float32)
 
         # self.compile(
         #     optimizer=keras.optimizers.Adam(config['learning_rate']),
@@ -20,27 +23,38 @@ class PRGNN(tf.keras.Model):
         # )
 
     def call(self, inputs):
-        # x, a, e = inputs
-        # x = self.masking(x)
-        # x = self.conv1([x, a, e])
-        # x = self.conv2([x, a, e])
-        # output = self.global_pool(x)
-        # output = self.dense(output)
-        #
-        # return output
-        graph, pref_a, pref_b = inputs
-        x, a, e = graph[0], graph[1], graph[2]
-        x = self.masking(x)
-        print(x.shape)
-        print(x)
-        # x = self.conv1([x, a, e])
-        # x = self.conv2([x, a, e])
-        # x_util = self.dense(x)
-        # X_a, X_b = self.pref_lookup(x_util, pref_a, pref_b)
+        ### inputs: ([x, a, e, i], idx_a, idx_b)
+        print("call")
+        # print(f"len(inputs): {len(inputs)}")
+        # print(f"inputs: {inputs}")
+        # print(f"x: {inputs[0][0]}")
+        # print(f"a: {inputs[0][1]}")
+        # print(f"e: {inputs[0][2]}")
+        # print(f"i: {inputs[0][3]}")
+        # print(f"idx_a: {inputs[1]}")
+        # print(f"idx_b: {inputs[2]}")
+        # print("call")
+        x, a, e, i, idx_a, idx_b = inputs
+        # x = tf.cast(x, tf.float32)
+        # a = tf.cast(a, tf.float32)
+        # e = tf.cast(e, tf.float32)
+        # i = tf.cast(i, tf.int32)
+        # idx_a = tf.cast(idx_a, tf.float32)
+        # idx_b = tf.cast(idx_b, tf.float32)
 
-        # return X_b - X_a
-        return x
+        x = self.conv1([x, a, e])
+        x = self.conv2([x, a, e])
+        output = self.global_pool([x, i])
+        output = self.dense(output)
+        X_a, X_b = self.pref_lookup(output, idx_a, idx_b)
+
+        return X_b - X_a
+
     def pref_lookup(self, X, pref_a, pref_b):
+        # pref_a = tf.cast(pref_a, tf.int32)
+        # pref_b = tf.cast(pref_b, tf.int32)
+
         X_a = tf.gather(X, pref_a, axis=0)
         X_b = tf.gather(X, pref_b, axis=0)
+
         return X_a, X_b
