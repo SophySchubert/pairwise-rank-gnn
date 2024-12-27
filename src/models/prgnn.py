@@ -50,7 +50,7 @@ class PRGNN(tf.keras.Model):
         X_a, X_b = self.pref_lookup(output, idx_a, idx_b)
         # print(X_a)
         # print(X_b)
-        # print(X_b - X_a)
+        # print((X_b - X_a).shape)
         # exit(1)
 
         return X_b - X_a

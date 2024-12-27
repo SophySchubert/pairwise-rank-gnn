@@ -136,7 +136,7 @@ class MyDisjointLoader(DisjointLoader):
         """
         signature = self.dataset.signature
         if "y" in signature:
-            signature["y"]["shape"] = prepend_none(signature["y"]["shape"])
+            signature["y"]["shape"] = prepend_none(signature["y"]["shape"]) #(12800,) #(None, 1)
         if "a" in signature:
             signature["a"]["spec"] = tf.SparseTensorSpec
 
