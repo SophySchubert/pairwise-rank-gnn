@@ -79,6 +79,7 @@ if __name__ == '__main__':
         # print(f"idx_b: {batch[0][2]}")
         # print(f"target: {batch[1]}")
         # print("batch in loader_tr")
+        # print(loader_tr.tf_signature())
 
         loss += train_step(*batch)
         if step == loader_tr.steps_per_epoch:

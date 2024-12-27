@@ -11,6 +11,7 @@ class PRGNN(tf.keras.Model):
         self.conv2 = ECCConv(32, activation="relu")
         self.global_pool = GlobalSumPool()
         self.dense = Dense(config['n_out'], activation='relu')
+        self._dense = Dense(128, activation='relu')
         self.pref_a = keras.Input(shape=(), dtype=tf.int32)
         self.pref_b = keras.Input(shape=(), dtype=tf.int32)
 
@@ -33,24 +34,24 @@ class PRGNN(tf.keras.Model):
         # print(f"idx_b: {inputs[2]}")
         # print("call")
         x, a, e, i, idx_a, idx_b = inputs
-        x = tf.cast(x, tf.int32)
-        a = tf.cast(a, tf.int32)
-        e = tf.cast(e, tf.int32)
-        i = tf.cast(i, tf.int32)
-        # idx_a = tf.cast(idx_a, tf.float32)
-        # idx_b = tf.cast(idx_b, tf.float32)
+        # print("types +  tensors")
+        # print(f"x:{x}")
+        # print(f"a:{a}")
+        # print(f"e:{e}")
+        # print(f"i:{i}")
+        # print(f"idx_a:{idx_a}")
+        # print(f"idx_b:{idx_b}")
 
-        x = self.conv1([x, a, e])
-        x = self.conv2([x, a, e])
-        output = self.global_pool([x, i])
-        output = self.dense(output)
+        # x = self.conv1([x, a, e])
+        # x = self.conv2([x, a, e])
+        # output = self.global_pool([x, i])
+        # output = self.dense(output)
+        output = self._dense(x)
         X_a, X_b = self.pref_lookup(output, idx_a, idx_b)
 
         return X_b - X_a
 
     def pref_lookup(self, X, pref_a, pref_b):
-        # pref_a = tf.cast(pref_a, tf.int32)
-        # pref_b = tf.cast(pref_b, tf.int32)
 
         X_a = tf.gather(X, pref_a, axis=0)
         X_b = tf.gather(X, pref_b, axis=0)
