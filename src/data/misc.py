@@ -167,7 +167,7 @@ class MyDisjointLoader(DisjointLoader):
             rnd.shuffle(part)
         idx_a = np.empty((sample_size,), dtype=np.int64)
         idx_b = np.empty((sample_size,), dtype=np.int64)
-        target = np.ones((sample_size,), dtype=np.int64)
+        target = np.ones((sample_size,), dtype=np.float64)
         k = 0
         for i in range(size):
             part = parts[i]
