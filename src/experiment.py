@@ -2,6 +2,9 @@ import sys
 import time
 import numpy as np
 import tensorflow as tf
+import pandas as pd
+from matplotlib import pyplot as plt
+from scipy.stats import kendalltau
 from tensorflow.keras.optimizers import Adam
 from keras.losses import BinaryCrossentropy, MeanSquaredError
 from keras.metrics import BinaryAccuracy
@@ -28,16 +31,17 @@ if __name__ == '__main__':
     ######################################################################
 
     # Load data and split it in train and test sets
-    train_graphs, train_pairs, train_y, test_graphs, test_pairs, test_y = get_data(config)
+    train_graphs, test_graphs = get_data(config)
     loader_tr = MyDisjointLoader(train_graphs, batch_size=config['batch_size'], epochs=config['epochs'], seed=config['seed'])
     loader_te = MyDisjointLoader(test_graphs, batch_size=config['batch_size'], epochs=1, seed=config['seed'])
 
     model = setup_model(config)
     model.compile(optimizer=Adam(config['learning_rate']),
                                  loss=BinaryCrossentropy(from_logits=True),
-                                 metrics=[BinaryAccuracy(threshold=.5)])
+                                 metrics=[BinaryAccuracy(threshold=.0)])
     optimizer = Adam(config['learning_rate'])
     loss_fn = MeanSquaredError()
+    accuracy_fn = BinaryAccuracy(threshold=.0)
 
 
     ################################################################################
@@ -45,59 +49,69 @@ if __name__ == '__main__':
     ################################################################################
     @tf.function(input_signature=loader_tr.tf_signature(), experimental_relax_shapes=True)
     def train_step(inputs, target):
-        print("train_step")
-        # print(f"len(inputs): {len(inputs)}")
-        # print(f"inputs: {inputs}")
-        # print(f"x: {inputs[0][0]}")
-        # print(f"a: {inputs[0][1]}")
-        # print(f"e: {inputs[0][2]}")
-        # print(f"i: {inputs[0][3]}")
-        # print(f"idx_a: {inputs[1]}")
-        # print(f"idx_b: {inputs[2]}")
-        # print(f"target: {target}")
-        # print("train_step")
         with tf.GradientTape() as tape:
             predictions = model(inputs, training=True)
             loss = loss_fn(target, predictions) + sum(model.losses)
         gradients = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-        return loss
+        accuracy = accuracy_fn(target, predictions)
+        return loss, accuracy
 
 
-    step = loss = 0
-    for batch in loader_tr:#batch[0]==axei, batch[1]==idx_a, batch[2]==idx_b, batch[3]==target
+    epoch = step = loss = accuracy = 0
+    epoch_loss = []
+    epoch_acc = []
+    for batch in loader_tr:
         step += 1
-        print("batch in loader_tr")
-        # print(f"len(batch): {len(batch)}")
-        # print(f"len(inputs): {len(batch[0])}")
-        # print(f"inputs: {batch[0]}")
-        # print(f"x: {batch[0][0][0]}")
-        # print(f"a: {batch[0][0][1]}")
-        # print(f"e: {batch[0][0][2]}")
-        # print(f"i: {batch[0][0][3]}")
-        # print(f"idx_a: {batch[0][1]}")
-        # print(f"idx_b: {batch[0][2]}")
-        # print(f"target: {batch[1]}")
-        # print("batch in loader_tr")
-        # print(loader_tr.tf_signature())
-
-        loss += train_step(*batch)
+        batch_loss, batch_accuracy = train_step(*batch)
+        loss += batch_loss
+        accuracy += batch_accuracy
         if step == loader_tr.steps_per_epoch:
             step = 0
-            print("Loss: {}".format(loss / loader_tr.steps_per_epoch))
-            loss = 0
+            epoch += 1
+            epoch_loss.append(loss / loader_tr.steps_per_epoch)
+            epoch_acc.append(accuracy / loader_tr.steps_per_epoch)
+            logger.info(f"Epoch:{epoch}, Loss: {epoch_loss[-1]}, Accuracy: {epoch_acc[-1]}")
+            loss = accuracy = 0
 
     ################################################################################
     # Evaluate model
     ################################################################################
-    print("Testing model")
-    loss = 0
+    logger.info("Testing model")
+    loss = accuracy = 0
     for batch in loader_te:
         inputs, target = batch
         predictions = model(inputs, training=False)
         loss += loss_fn(target, predictions)
+        accuracy += accuracy_fn(target, predictions)
     loss /= loader_te.steps_per_epoch
-    print("Done. Test loss: {}".format(loss))
+    accuracy /= loader_te.steps_per_epoch
+
+    logger.info(f"Done. Test loss: {loss}, Test accuracy: {accuracy}, kendalltau: {kendalltau(x=target, y=predictions)}")
 
 
     logger.info("--- %s seconds ---" % (time.time() - start_time))
+    ###############################################################################
+    df = pd.DataFrame({'loss': np.array(epoch_loss), 'accuracy': np.array(epoch_acc)})
+    df.to_csv(config['folder_path'] + '/loss_acc.csv', index=False)
+    ###############################################################################
+    fig, ax1 = plt.subplots()
+
+    # Plot loss
+    ax1.set_xlabel('Epochs')
+    ax1.set_ylabel('Loss', color='tab:red')
+    start = 40
+    ax1.plot(range(start, len(epoch_loss[start:]) + 1), epoch_loss[20:], color='tab:red', label='Loss')
+    ax1.tick_params(axis='y', labelcolor='tab:red')
+
+    # Create a second y-axis for accuracy
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('Accuracy', color='tab:blue')
+    ax2.plot(range(start, len(epoch_acc[start:]) + 1), epoch_acc[20:], color='tab:blue', label='Accuracy')
+    ax2.tick_params(axis='y', labelcolor='tab:blue')
+
+    # Add a title and show the plot
+    fig.suptitle('Training Loss and Accuracy per Epoch')
+    fig.tight_layout()
+    plt.savefig(config['folder_path'] + '/loss_acc.png')
+

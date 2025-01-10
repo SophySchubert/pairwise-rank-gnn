@@ -46,11 +46,6 @@ def _sample_pairs(dataset):
     ids = np.array(list(zip(_pairs_even_ids, _pairs_odd_ids)))
     targets = [np.maximum(d[0], d[1]) for d in data]
 
-    # ids = np.array(ids, dtype=np.int64)
-    # targets = np.array(targets, dtype=np.int64)
-    # print(ids.dtype)
-    # print(targets.dtype)
-
     for i, tuple in enumerate(ids):
         dataset[tuple[0]].pair = tuple
         dataset[tuple[0]].pair_target = targets[i]
@@ -63,17 +58,10 @@ def get_data(config):
     seed = config['seed']
     train_test_split = config['train_test_split']
     name = config['dataset']
-    pairwise = config['pairwise']
 
     # Load data
     data, config['n_out'] = _load_data(name)
     # Split data
     train_data, test_data = _split_data(data, train_test_split, seed)
-    # Create pairs
-    train_pairs, train_targets = None, None,
-    test_pairs, test_targets = None, None
-    if pairwise:
-        train_pairs, train_targets = _sample_pairs(train_data)
-        test_pairs, test_targets = _sample_pairs(test_data)
 
-    return train_data, train_pairs, train_targets, test_data, test_pairs, test_targets
+    return train_data, test_data

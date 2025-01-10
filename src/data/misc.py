@@ -5,10 +5,10 @@ from spektral.data import DisjointLoader
 from spektral.data.loaders import tf_loader_available
 import scipy.sparse as sp
 from spektral.data.utils import (
-    collate_labels_disjoint,
     prepend_none,
     sp_matrices_to_sp_tensors,
-    to_disjoint
+    to_disjoint,
+    collate_labels_disjoint
 )
 
 def spektral_graph_to_nx_graph(spektral_graph):
@@ -108,13 +108,7 @@ class MyDisjointLoader(DisjointLoader):
         output = to_disjoint(**packed)
         output = sp_matrices_to_sp_tensors(output)
 
-        if len(output) == 1:
-            output = output[0]
-
-        if y is None:
-            return output
-        else:
-            return (output, idx_a, idx_b), target
+        return output + (idx_a, idx_b), target
 
     def load(self):
         print("load")
@@ -187,4 +181,4 @@ class MyDisjointLoader(DisjointLoader):
                     if ni < i:
                         target[k:k + psize] = 0
                     k += psize
-        return idx_a, idx_b, target
+        return idx_a, idx_b, target.reshape(-1, 1)

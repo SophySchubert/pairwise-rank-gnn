@@ -11,5 +11,5 @@ pip install -r requirements.txt
 - choose a config from src/config OR
 - create a config file and place it in the src/config folder
 ```bash
-python .\src\experiment.py .\src\config\default.json
+python .\src\experiment.py .\src\config\default.yml
 ```
