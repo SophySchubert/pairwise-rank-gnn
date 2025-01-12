@@ -7,7 +7,7 @@ from shutil import copyfile
 
 from models.prgnn import PRGNN
 from models.general_gnn import Net
-from models.DirectRanker import DirectRanker
+from models.direct_ranker import DirectRanker
 
 def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)s - %(message)s"):
     """

@@ -61,6 +61,7 @@ def get_data(config):
 
     # Load data
     data, config['n_out'] = _load_data(name)
+    config['max_nodes'] = max(g.n_nodes for g in data)
     # Split data
     train_data, test_data = _split_data(data, train_test_split, seed)
 

@@ -1,4 +1,5 @@
 import sys
+import shutil
 import time
 import numpy as np
 import tensorflow as tf
@@ -29,6 +30,8 @@ if __name__ == '__main__':
     np.random.seed(config['seed'])
     tf.random.set_seed(config['seed'])
     ######################################################################
+    shutil.copy(f"./src/models/{config['model']}.py", config['folder_path']+ '/nn_model.py')
+    ###############################################################################
 
     # Load data and split it in train and test sets
     train_graphs, test_graphs = get_data(config)
@@ -69,8 +72,8 @@ if __name__ == '__main__':
         if step == loader_tr.steps_per_epoch:
             step = 0
             epoch += 1
-            epoch_loss.append(loss / loader_tr.steps_per_epoch)
-            epoch_acc.append(accuracy / loader_tr.steps_per_epoch)
+            epoch_loss.append(np.array(loss / loader_tr.steps_per_epoch))
+            epoch_acc.append(np.array(accuracy / loader_tr.steps_per_epoch))
             logger.info(f"Epoch:{epoch}, Loss: {epoch_loss[-1]}, Accuracy: {epoch_acc[-1]}")
             loss = accuracy = 0
 
@@ -92,7 +95,7 @@ if __name__ == '__main__':
 
     logger.info("--- %s seconds ---" % (time.time() - start_time))
     ###############################################################################
-    df = pd.DataFrame({'loss': np.array(epoch_loss), 'accuracy': np.array(epoch_acc)})
+    df = pd.DataFrame({'loss': epoch_loss, 'accuracy': epoch_acc})
     df.to_csv(config['folder_path'] + '/loss_acc.csv', index=False)
     ###############################################################################
     fig, ax1 = plt.subplots()
@@ -100,18 +103,18 @@ if __name__ == '__main__':
     # Plot loss
     ax1.set_xlabel('Epochs')
     ax1.set_ylabel('Loss', color='tab:red')
-    start = 40
-    ax1.plot(range(start, len(epoch_loss[start:]) + 1), epoch_loss[20:], color='tab:red', label='Loss')
+    ax1.plot(range(1, len(epoch_loss) + 1), epoch_loss, color='tab:red', label='Loss')
     ax1.tick_params(axis='y', labelcolor='tab:red')
 
     # Create a second y-axis for accuracy
     ax2 = ax1.twinx()
     ax2.set_ylabel('Accuracy', color='tab:blue')
-    ax2.plot(range(start, len(epoch_acc[start:]) + 1), epoch_acc[20:], color='tab:blue', label='Accuracy')
+    ax2.plot(range(1, len(epoch_acc) + 1), epoch_acc, color='tab:blue', label='Accuracy')
     ax2.tick_params(axis='y', labelcolor='tab:blue')
 
     # Add a title and show the plot
     fig.suptitle('Training Loss and Accuracy per Epoch')
     fig.tight_layout()
     plt.savefig(config['folder_path'] + '/loss_acc.png')
+    plt.show()
 
