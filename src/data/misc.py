@@ -91,14 +91,16 @@ class MyDisjointLoader(DisjointLoader):
     """
 
     def __init__(
-        self, dataset, node_level=False, batch_size=1, epochs=None, shuffle=True, seed=42
+        self, dataset, node_level=False, batch_size=1, epochs=None, shuffle=True, seed=42, radius=4, sampling_ratio=100
     ):
         self.node_level = node_level
         super().__init__(dataset, batch_size=batch_size, epochs=epochs, shuffle=shuffle)
         self.seed = seed
+        self.radius = radius
+        self.sampling_ratio = sampling_ratio
 
     def collate(self, batch):
-        idx_a, idx_b, target = self.sample_preference_pairs(batch, seed=self.seed)
+        idx_a, idx_b, target = self.sample_preference_pairs(batch, seed=self.seed, radius=self.radius, sampling_ratio=self.sampling_ratio)
         packed = self.pack(batch)
 
         y = packed.pop("y_list", None)
@@ -151,6 +153,7 @@ class MyDisjointLoader(DisjointLoader):
         return to_tf_signature(signature)
 
     def sample_preference_pairs(self, graphs, radius=4, sampling_ratio=100, seed=42):
+        seed = self.seed
         size = len(graphs)
         sample_size = size * radius * sampling_ratio
         r = np.arange(size)

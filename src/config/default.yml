@@ -3,10 +3,10 @@ folder_path: experiment
 logger:
   level: 10 # CRITICAL = 50, ERROR = 40, WARNING = 30, INFO = 20, DEBUG = 10, NOTSET = 0
   format: "%(asctime)s - %(levelname)s - %(message)s"
-seed: 5
-epochs: 20
+seed: 1
+epochs: 5
 batch_size: 32
-learning_rate: 0.001 #1e-3
+learning_rate: 0.001
 model: prgnn # general_gnn, direct_ranker, prgnn
 dataset: ogbg-molesol #JA: QM9, ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC| NEIN: aspirin
 train_test_split: 0.8

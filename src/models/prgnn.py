@@ -14,15 +14,15 @@ class PRGNN(tf.keras.Model):
         self.conv1 = ECCConv(32, activation="relu")
         self.conv2 = ECCConv(32, activation="relu")
         self.global_pool = GlobalSumPool()
-        self.util = Dense(config['n_out'])
-        self.pref_a = keras.Input(shape=(), dtype=tf.int32)
-        self.pref_b = keras.Input(shape=(), dtype=tf.int32)
+        self.dense = Dense(config['n_out'], activation='relu')
 
     def call(self, inputs):
         x, a, e, i, idx_a, idx_b = inputs
         x = tf.cast(x, tf.float32)
         x = self.conv1([x, a, e])
         x = self.conv2([x, a, e])
+
+        x = tf.cast(x, tf.int32)
         x = self.global_pool([x, i])
         x_util = self.util(x)
         X_a, X_b = self.pref_lookup(x_util, idx_a, idx_b)
