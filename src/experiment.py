@@ -33,7 +33,7 @@ if __name__ == '__main__':
     # Load data and split it in train and test sets
     train_graphs, test_graphs = get_data(config)
     loader_tr = MyDisjointLoader(train_graphs, batch_size=config['batch_size'], epochs=config['epochs'], seed=config['seed'])
-    loader_te = MyDisjointLoader(test_graphs, batch_size=config['batch_size'], epochs=1, seed=config['seed'])
+    loader_te = MyDisjointLoader(test_graphs, batch_size=config['batch_size'], epochs=1, seed=config['seed'], radius=1, sampling_ratio=1)
 
     model = setup_model(config)
     model.compile(optimizer=Adam(config['learning_rate']),
