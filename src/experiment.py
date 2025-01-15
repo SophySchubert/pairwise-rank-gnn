@@ -1,6 +1,7 @@
 import sys
 import shutil
 import time
+import shutil
 import numpy as np
 import tensorflow as tf
 import pandas as pd
@@ -29,6 +30,7 @@ if __name__ == '__main__':
     logger.info(f"Experiment saved in {config['folder_path']}")
     np.random.seed(config['seed'])
     tf.random.set_seed(config['seed'])
+    shutil.copy('src/models/prgnn.py', config['folder_path']+'/model.py')
     ######################################################################
     shutil.copy(f"./src/models/{config['model']}.py", config['folder_path']+ '/nn_model.py')
     ###############################################################################
