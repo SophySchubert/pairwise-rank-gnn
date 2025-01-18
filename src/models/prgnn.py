@@ -16,15 +16,16 @@ class PRGNN(tf.keras.Model):
         self.dropout = Dropout(0.5)
         self.batchnorm = BatchNormalization()
         self.global_pool = GlobalSumPool()
-        self.dense = Dense(config['n_out'], activation='relu')
+        self.dense = Dense(config['n_out'], activation=None)
 
     def call(self, inputs):
         x, a, e, i, idx_a, idx_b = inputs
         x = tf.cast(x, tf.float32)
-        a = tf.cast(a, tf.float32)
+        # a = tf.cast(a, tf.float32)
         e = tf.cast(e, tf.float32)
+        a = a.with_values(tf.cast(a.values, tf.float32))
 
-        x = self.masking(x)
+        # x = self.masking(x)
         X = self.conv1([x, a, e])
         # X = self.dropout(X)
         X = self.conv2([X, a, e])
@@ -34,11 +35,14 @@ class PRGNN(tf.keras.Model):
         X = self.conv4([X, a, e])
         # X = self.dropout(X)
         X = self.conv5([X, a, e])
+        # print(f"{X}")
         # X = self.dropout(X)
 
         # X = self.global_pool([X, i])
-        X = self.dense(X)
-        X_a, X_b = self.pref_lookup(X, idx_a, idx_b)
+        X_util = self.dense(X)
+        # print(X_util)
+        X_a, X_b = self.pref_lookup(X_util, idx_a, idx_b)
+
 
         return X_b - X_a
 

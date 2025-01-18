@@ -3,7 +3,6 @@ import numpy as np
 import tensorflow as tf
 from spektral.data import DisjointLoader
 from spektral.data.loaders import tf_loader_available
-import scipy.sparse as sp
 from spektral.data.utils import (
     prepend_none,
     sp_matrices_to_sp_tensors,
@@ -90,17 +89,16 @@ class MyDisjointLoader(DisjointLoader):
 
     """
 
-    def __init__(
-        self, dataset, node_level=False, batch_size=1, epochs=None, shuffle=True, seed=42, radius=4, sampling_ratio=100
-    ):
+    def __init__(self, dataset, node_level=False, batch_size=1, epochs=None, shuffle=True, seed=42):
         self.node_level = node_level
         super().__init__(dataset, batch_size=batch_size, epochs=epochs, shuffle=shuffle)
         self.seed = seed
-        self.radius = radius
-        self.sampling_ratio = sampling_ratio
 
     def collate(self, batch):
-        idx_a, idx_b, target = self.sample_preference_pairs(batch, seed=self.seed, radius=self.radius, sampling_ratio=self.sampling_ratio)
+        #idx_a, idx_b, target = self.sample_preference_pairs(batch, seed=self.seed, radius=self.radius, sampling_ratio=self.sampling_ratio)
+        batch, (idx_a, idx_b), target = batch[0], batch[1], batch[2]
+        print((idx_a, idx_b))
+        exit(1)
         packed = self.pack(batch)
 
         y = packed.pop("y_list", None)
@@ -110,7 +108,7 @@ class MyDisjointLoader(DisjointLoader):
         output = to_disjoint(**packed)
         output = sp_matrices_to_sp_tensors(output)
 
-        return output + (idx_a, idx_b), target
+        return output, target #output + (idx_a, idx_b), target
 
     def load(self):
         print("load")
@@ -151,37 +149,3 @@ class MyDisjointLoader(DisjointLoader):
         signature["idx_b"]["dtype"] = tf.as_dtype(tf.int64)
 
         return to_tf_signature(signature)
-
-    def sample_preference_pairs(self, graphs, radius=4, sampling_ratio=100, seed=42):
-        seed = self.seed
-        size = len(graphs)
-        sample_size = size * radius * sampling_ratio
-        r = np.arange(size)
-        S = sp.csr_matrix((r, (r, r)), shape=(size, size))
-        parts = np.split(S.data, S.indptr[1:-1])
-        rnd = np.random.default_rng(seed)
-        for part in parts:
-            rnd.shuffle(part)
-        idx_a = np.empty((sample_size,), dtype=np.int64)
-        idx_b = np.empty((sample_size,), dtype=np.int64)
-        target = np.ones((sample_size,), dtype=np.float64)
-        k = 0
-        for i in range(size):
-            part = parts[i]
-            psize = len(part)
-            for d in range(radius):
-                ni = (i + d + 1) % size
-                npart = parts[ni]
-                npsize = len(npart)
-                for j in range(sampling_ratio):
-                    npart_offset = np.roll(npart, d * sampling_ratio + j)
-                    idx_a[k:k + psize] = part
-                    if npsize < psize:
-                        idx_b[k:k + npsize] = npart_offset
-                        idx_b[k + npsize:k + psize] = npart_offset[:psize - npsize]
-                    else:
-                        idx_b[k:k + psize] = npart_offset[:psize]
-                    if ni < i:
-                        target[k:k + psize] = 0
-                    k += psize
-        return idx_a, idx_b, target.reshape(-1, 1)
