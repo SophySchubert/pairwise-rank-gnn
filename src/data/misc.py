@@ -128,24 +128,18 @@ class MyDisjointLoader(DisjointLoader):
         Targets have shape [*, n_labels]
         Pairs have shape [*, 2]
         """
-        signature = self.dataset.signature
+        # signature = self.dataset.signature
+        if isinstance(self.dataset, list):
+            signature = self.dataset[0].signature  # Assuming all datasets have the same signature
+        else:
+            signature = self.dataset.signature
         if "y" in signature:
             signature["y"]["shape"] = prepend_none(signature["y"]["shape"]) #(12800,) #(None, 1)
         if "a" in signature:
             signature["a"]["spec"] = tf.SparseTensorSpec
 
-        signature["i"] = dict()
-        signature["i"]["spec"] = tf.TensorSpec
-        signature["i"]["shape"] = (None,)
-        signature["i"]["dtype"] = tf.as_dtype(tf.int64)
-
-        signature["idx_a"] = dict()
-        signature["idx_a"]["spec"] = tf.TensorSpec
-        signature["idx_a"]["shape"] = (None,)
-        signature["idx_a"]["dtype"] = tf.as_dtype(tf.int64)
-        signature["idx_b"] = dict()
-        signature["idx_b"]["spec"] = tf.TensorSpec
-        signature["idx_b"]["shape"] = (None,)
-        signature["idx_b"]["dtype"] = tf.as_dtype(tf.int64)
+        signature["i"] = {"spec": tf.TensorSpec, "shape": (None,), "dtype": tf.as_dtype(tf.int64)}
+        signature["idx_a"] = {"spec": tf.TensorSpec, "shape": (None,), "dtype": tf.as_dtype(tf.int64)}
+        signature["idx_b"] = {"spec": tf.TensorSpec, "shape": (None,), "dtype": tf.as_dtype(tf.int64)}
 
         return to_tf_signature(signature)

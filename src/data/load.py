@@ -107,7 +107,7 @@ def get_data(config):
     # Split data
     train_data, test_data = _split_data(data, train_test_split, seed)
     # Sample pairs
-    train_idx_a, train_idx_b, train_tragets = sample_preference_pairs(train_data, 4, 100, seed)
-    test_idx_a, test_idx_b, test_targets = sample_preference_pairs(test_data, 4, 100, seed)
+    train_idx_a, train_idx_b, train_tragets = sample_preference_pairs(train_data, 4, 1, seed)
+    test_idx_a, test_idx_b, test_targets = sample_preference_pairs(test_data, 1, 1, seed)
 
     return [train_data, (train_idx_a, train_idx_b), train_tragets], [test_data, (test_idx_a, test_idx_b), test_targets]
