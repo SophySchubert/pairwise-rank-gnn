@@ -46,34 +46,30 @@ if __name__ == '__main__':
         X_b = tf.gather(X, pref_b, axis=0)
         return X_a, X_b
 
-    def myModel():
-        x = tf.keras.Input(shape=(None, None, 9), dtype=tf.int64)
-        a = tf.keras.Input(shape=(None, None, None), dtype=tf.float64, sparse=True)
-        e = tf.keras.Input(shape=(None, None, 3),dtype=tf.int64)
-        i = tf.keras.Input(shape=(None, None,), dtype=tf.int64)
-        pref_a = tf.keras.Input(shape=(None, 12800,), dtype=tf.int64)
-        pref_b = tf.keras.Input(shape=(None, 12800,), dtype=tf.int64)
-        x_0 = tf.cast(x, tf.float32)
-        
+    def createPairwiseModel(config):
+            X_input = tf.keras.Input(shape=(32, 9), dtype=tf.float32)
+            a_input = tf.keras.Input(shape=(1,1), sparse=True)
+            e_input = tf.keras.Input(shape=(32, 3), dtype=tf.float32)
+            i_input = tf.keras.Input(shape=(), dtype=tf.int32)
+            pref_a = tf.keras.Input(shape=(), dtype=tf.int32)
+            pref_b = tf.keras.Input(shape=(), dtype=tf.int32)
+            _model = setup_model(config)
+            out, X_utils = _model([X_input, a_input, e_input, i_input, pref_a, pref_b])
+            m = tf.keras.Model(inputs=[X_input, a_input, e_input, i_input, pref_a, pref_b], outputs=out, name="RankNet")
+            m_infer = tf.keras.Model(inputs=[X_input, a_input, e_input, i_input], outputs=X_utils, name="RankNet_predictor")
+            m.compile(
+                optimizer=
+                    Adam(config['learning_rate']),
+                    loss=BinaryCrossentropy(from_logits=True),
+                    metrics=[BinaryAccuracy(threshold=.0)]
 
-        x_1 = spektral.layers.GCNConv(128, activation="relu")([x_0, a])
-        x_1 = tf.keras.layers.BatchNormalization()(x_1)
-        x_1 = tf.keras.layers.Dropout(0.5)(x_1)
-        x_2 = spektral.layers.GCNConv(128, activation="relu")([x_1, a])
-        x_2 = tf.keras.layers.BatchNormalization()(x_2)
-        x_2 = tf.keras.layers.Dropout(0.5)(x_2)
-        X_utils = spektral.layers.GCNConv(1, activation="softmax")([x_2, a])
-
-        # X_utils = keras.layers.Dense(1, activation="relu")(x_3)
-        X_a, X_b = pref_lookup(X_utils, pref_a, pref_b)
-        out = X_b - X_a
-
-        return out
+            )
+            return m, m_infer
 
     model = setup_model(config)
     model.compile(optimizer=Adam(config['learning_rate']),
                                  loss=BinaryCrossentropy(from_logits=True),
-                                 metrics=[BinaryAccuracy(threshold=.0)])
+                                 metrics=[BinaryAccuracy(threshold=.5)])
     optimizer = Adam(config['learning_rate'])
     loss_fn = MeanSquaredError()
     accuracy_fn = BinaryAccuracy(threshold=.0)
