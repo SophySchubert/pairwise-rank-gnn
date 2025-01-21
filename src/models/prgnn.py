@@ -7,8 +7,8 @@ from spektral.layers import GlobalSumPool, ECCConv, GraphMasking
 class PRGNN(tf.keras.Model):
     def __init__(self, config):
         super().__init__()
-        self.conv1 = ECCConv(256, activation="relu")
-        self.conv2 = ECCConv(128, activation="relu")
+        self.conv1 = ECCConv(32, activation="relu")
+        self.conv2 = ECCConv(32, activation="relu")
         self.dense = Dense(config['n_out'], activation=None)
 
     def call(self, inputs):
@@ -23,7 +23,7 @@ class PRGNN(tf.keras.Model):
         X_util = self.dense(X)
         X_a, X_b = self.pref_lookup(X_util, idx_a, idx_b)
 
-        return X_b - X_a, X_util
+        return X_b - X_a#, X_util
 
     def pref_lookup(self, X, pref_a, pref_b):
 

@@ -8,9 +8,9 @@ def _load_data(name: str):
     '''
     Loads a dataset from [TUDataset, OGB]
     '''
-    if name == 'QM9':
-        dataset = QM9(amount=1000)# 1000 and 100000 ok
-    elif name in TUDataset.available_datasets():
+    # if name == 'QM9':
+    #     dataset = QM9(amount=10)# 1000 and 100000 ok
+    if name in TUDataset.available_datasets():
         dataset = TUDataset(name)
     elif name in ogb_available_datasets():
         dataset= OGBDataset(name)
@@ -30,29 +30,16 @@ def _split_data(data, train_test_split, seed):
     train, test = data[idx_train], data[idx_test]
     return train, test
 
-def _sample_pairs(dataset):
-    '''
-    Sample pairs of graphs from a dataset
-    '''
-    assert(len(dataset) % 2 == 0)
-    len_dataset = len(dataset)
-    dataset_targets = [d.y for d in dataset]
-    _pairs_even = dataset_targets[::2]
-    _pairs_odd = dataset_targets[1::2]
-    _pairs_even_ids = range(0, len_dataset, 2)
-    _pairs_odd_ids = range(1, len_dataset, 2)
+def _rankData(data):
+    indexed_graphs= list(enumerate(data))
 
-    data = list(zip(_pairs_even, _pairs_odd))
-    ids = np.array(list(zip(_pairs_even_ids, _pairs_odd_ids)))
-    targets = [np.maximum(d[0], d[1]) for d in data]
+    sorted_indexed_graphs = sorted(indexed_graphs, key=lambda x: x[1].y)
 
-    for i, tuple in enumerate(ids):
-        dataset[tuple[0]].pair = tuple
-        dataset[tuple[0]].pair_target = targets[i]
-        dataset[tuple[1]].pair = tuple
-        dataset[tuple[1]].pair_target = targets[i]
+    sorted_graphs = [g for index, g in sorted_indexed_graphs]
+    original_indices = [index for index, g in sorted_indexed_graphs]
 
-    return ids, targets
+    return original_indices#zip(sorted_graphs, original_indices)
+
 
 def get_data(config):
     seed = config['seed']
@@ -61,8 +48,8 @@ def get_data(config):
 
     # Load data
     data, config['n_out'] = _load_data(name)
-    config['max_nodes'] = max(g.n_nodes for g in data)
+    ground_truth_ranking = _rankData(data)
     # Split data
     train_data, test_data = _split_data(data, train_test_split, seed)
 
-    return train_data, test_data
+    return train_data, test_data, ground_truth_ranking
