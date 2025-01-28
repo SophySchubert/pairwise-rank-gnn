@@ -49,21 +49,23 @@ if __name__ == '__main__':
         X_b = tf.gather(X, pref_b, axis=0)
         return X_a, X_b
 
-    # def createPairwiseModel(config, inputs):
-    #     x, a, e, i, idx_a, idx_b = inputs
-    #
-    #     x = tf.cast(x, tf.float32)
-    #     a = a.with_values(tf.cast(a.values, tf.float32))
-    #     e = tf.cast(e, tf.float32)
-    #     conv1 = ECCConv(32, activation="relu")([x, a, e])
-    #     conv2 = ECCConv(32, activation="relu")([conv1, a, e])
-    #     x_util = Dense(config['n_out'], activation=None)(conv2)
-    #     X_a, X_b = pref_lookup(x_util, idx_a, idx_b)
-    #     out = X_b - X_a
-    #
-    #     m = tf.keras.Model(inputs=[x, a, e, idx_a, idx_b], outputs=out, name="RankNet")
-    #     m_infer = tf.keras.Model(inputs=[x, a, e, idx_a, idx_b], outputs=x_util, name="RankNet_predictor")
-    #     return m, m_infer
+    def createPairwiseModel(config, inputs):
+        inputs = tf.keras.Input(shape=(None, None), name='inputs')
+        x, a, e, i, idx_a, idx_b = inputs#ohne batch dimension None am Anfang, anders als beim DataLoader, Input statt InputLayer
+
+        x = tf.cast(x, tf.float32)
+        a = a.with_values(tf.cast(a.values, tf.float32))
+        e = tf.cast(e, tf.float32)
+
+        conv1 = ECCConv(32, activation="relu")([x, a, e])
+        conv2 = ECCConv(32, activation="relu")([conv1, a, e])
+        x_util = Dense(config['n_out'], activation=None)(conv2)
+        X_a, X_b = pref_lookup(x_util, idx_a, idx_b)
+        out = X_b - X_a
+
+        m = tf.keras.Model(inputs=[x, a, e, idx_a, idx_b], outputs=out, name="RankNet")
+        m_infer = tf.keras.Model(inputs=[x, a, e], outputs=x_util, name="RankNet_predictor")
+        return m, m_infer
 
     # model = createPairwiseModel(config)
     model = setup_model(config)

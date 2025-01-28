@@ -158,3 +158,19 @@ class MyDisjointLoader(DisjointLoader):
             return 1
         else:
             return 0
+
+def iterate_train_random(elements):
+    objects = elements#, _, sort_idx
+    olen = objects.size
+    seed = 3 + olen#self.seed
+    pair_count = (olen * (olen - 1)) // 2
+    sample_size = min(int(20 * pair_count), pair_count)#self.sample_ratio
+    rng = np.random.default_rng(seed)
+
+    sample = rng.choice(pair_count, sample_size, replace=False)
+    sample_b = (np.sqrt(sample * 2 + 1/4) + 1/2).astype(np.int)
+    sample_a = sample - (sample_b * (sample_b - 1)) // 2
+    # idx_a = sort_idx[sample_a]
+    # idx_b = sort_idx[sample_b]
+
+    yield from zip(idx_a, idx_b)
