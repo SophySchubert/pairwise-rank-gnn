@@ -159,18 +159,90 @@ class MyDisjointLoader(DisjointLoader):
         else:
             return 0
 
-def iterate_train_random(elements):
-    objects = elements#, _, sort_idx
-    olen = objects.size
-    seed = 3 + olen#self.seed
-    pair_count = (olen * (olen - 1)) // 2
-    sample_size = min(int(20 * pair_count), pair_count)#self.sample_ratio
-    rng = np.random.default_rng(seed)
+class CustomDataLoader(tf.keras.utils.Sequence):
+    def __init__(self, data, batch_size=32, shuffle=True, seed=42, sampling_ratio=20):
+        self.data = data
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.seed = seed
+        self.sampling_ratio = sampling_ratio
+        self.indices = np.arange(len(self.data))
+        self.node_level = False
+        self.on_epoch_end()
 
-    sample = rng.choice(pair_count, sample_size, replace=False)
-    sample_b = (np.sqrt(sample * 2 + 1/4) + 1/2).astype(np.int)
-    sample_a = sample - (sample_b * (sample_b - 1)) // 2
-    # idx_a = sort_idx[sample_a]
-    # idx_b = sort_idx[sample_b]
+    def __len__(self):
+        return int(np.floor(len(self.data) / self.batch_size))
 
-    yield from zip(idx_a, idx_b)
+    def __getitem__(self, index):
+        indices = np.array(self.indices[index*self.batch_size:(index+1)*self.batch_size])
+        idx_a, idx_b = self.iterate_train_random(indices)
+        batch_data = self.data[indices]
+        #disjointloader content start
+        packed = self.pack(batch_data)
+        y = packed.pop("y_list", None)
+        if y is not None:
+            y = collate_labels_disjoint(y, node_level=self.node_level)
+        output = to_disjoint(**packed)
+        output = sp_matrices_to_sp_tensors(output)
+        #disjointloader content end
+
+        # target berechnen für die pairs start
+        #print(idx_a)
+        target = self.get_target(idx_a, idx_b)
+        # target berechnen für die pairs ende
+
+        return output + (idx_a, idx_b), target #batch_data, batch_labels
+
+    def on_epoch_end(self):
+        if self.shuffle:
+            np.random.shuffle(self.indices)
+
+    def iterate_train_random(self, elements):
+        objects = elements
+        sort_idx = np.argsort(objects)
+        olen = objects.size
+        seed = self.seed + olen
+        pair_count = (olen * (olen - 1)) // 2
+        sample_size = min(int(self.sampling_ratio * pair_count), pair_count)
+        rng = np.random.default_rng(seed)
+
+        sample = rng.choice(pair_count, sample_size, replace=False)
+        sample_b = (np.sqrt(sample * 2 + 1/4) + 1/2).astype(np.int)
+        sample_a = sample - (sample_b * (sample_b - 1)) // 2
+        idx_a = sort_idx[sample_a]
+        idx_b = sort_idx[sample_b]
+
+        return idx_a, idx_b
+
+    def pack(self, batch):
+        """
+        Given a batch of graphs, groups their attributes into separate lists and packs
+        them in a dictionary.
+
+        For instance, if a batch has three graphs g1, g2 and g3 with node
+        features (x1, x2, x3) and adjacency matrices (a1, a2, a3), this method
+        will return a dictionary:
+
+        ```python
+        >>> {'a_list': [a1, a2, a3], 'x_list': [x1, x2, x3]}
+        ```
+
+        :param batch: a list of `Graph` objects.
+        """
+        output = [list(elem) for elem in zip(*[g.numpy() for g in batch])]
+        keys = [k + "_list" for k in self.data.signature.keys()]
+        return dict(zip(keys, output))
+
+    def get_target(self, indices_a, indices_b):
+        assert(len(indices_a)==len(indices_b))
+        a = self.data[indices_a]
+        b = self.data[indices_b]
+        t = []
+        for i in range(len(indices_a)):
+            util_a = a[i].y
+            util_b = b[i].y
+            if util_a >= util_b:
+                t.append(1)
+            else:
+                t.append(0)
+        return np.array(t)
