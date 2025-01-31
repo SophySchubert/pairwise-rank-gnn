@@ -16,7 +16,8 @@ from spektral.layers import ECCConv
 
 from misc import setup_experiment, setup_logger, now, setup_model
 from data.load import get_data
-from data.loader import MyDisjointLoader
+from data.loader import MyDisjointLoader, CustomDataLoader
+from data.misc import FrankensteinLoader
 
 if __name__ == '__main__':
     start_time = time.time()
@@ -38,9 +39,53 @@ if __name__ == '__main__':
 
     # Load data and split it in train and test sets
     train_graphs, test_graphs, base_ranking = get_data(config)
+    print(f"len train_graphs:{len(train_graphs)}")
+    # exit(1)
     loader_tr = MyDisjointLoader(train_graphs, batch_size=config['batch_size'], epochs=config['epochs'], seed=config['seed'])
     loader_te = MyDisjointLoader(test_graphs, batch_size=config['batch_size'], epochs=1, seed=config['seed'])
+    ##############setup C#####################
+    from itertools import combinations
+    def sample_preference_pairs(graphs):
+        c = [(a, b, check_util(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
+        idx_a = []
+        idx_b = []
+        target = []
+        for id_a, id_b, t in c:
+            idx_a.append(id_a)
+            idx_b.append(id_b)
+            target.append(t)
+        return np.array(list(zip(idx_a,idx_b))), np.array(target).reshape(-1)
 
+    def check_util(data, index_a, index_b):
+        a = data[index_a]
+        b = data[index_b]
+        util_a = a.y
+        util_b = b.y
+        if util_a >= util_b:
+            return 1
+        else:
+            return 0
+
+    pairs, targets = sample_preference_pairs(train_graphs)
+    data_loader = CustomDataLoader(train_graphs, pairs, targets, batch_size=32, seed=42)
+    ######## setup D############
+    def sample_preference_pairs2(graphs):
+        c = [(a, b, check_util2(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
+        return np.array(c)
+
+    def check_util2(data, index_a, index_b):
+        a = data[index_a]
+        b = data[index_b]
+        util_a = a.y
+        util_b = b.y
+        if util_a >= util_b:
+            return 1
+        else:
+            return 0
+
+    pairs_and_targets = sample_preference_pairs2(train_graphs)
+    print(f"pairs_and_targets:{pairs_and_targets}")
+    data_loader = FrankensteinLoader(train_graphs, pairs_and_targets, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
     #########
     # model #
     #########
@@ -77,7 +122,7 @@ if __name__ == '__main__':
     ################################################################################
     # Fit model
     ################################################################################
-    hs = model.fit(loader_tr.load(), steps_per_epoch=loader_tr.steps_per_epoch, epochs=config['epochs'], verbose=1)
+    hs = model.fit(data_loader, epochs=config['epochs'], verbose=1)
     ################################################################################
     # Evaluate model
     ################################################################################
