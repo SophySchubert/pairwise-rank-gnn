@@ -111,9 +111,31 @@ if __name__ == '__main__':
         m = tf.keras.Model(inputs=[x, a, e, idx_a, idx_b], outputs=out, name="RankNet")
         m_infer = tf.keras.Model(inputs=[x, a, e], outputs=x_util, name="RankNet_predictor")
         return m, m_infer
+    def combine_model(model):
+        from tensorflow.keras.layers import Dense, Subtract
+        # Extract the input and output from the given model
+        X_input = model()
+        X_util = model.output
+
+        # Define the additional layers
+        idx_a = tf.keras.Input(shape=(None,), name='idx_a')
+        idx_b = tf.keras.Input(shape=(None,), name='idx_b')
+        X_a = tf.gather(X_util, idx_a, axis=0)
+        X_b = tf.gather(X_util, idx_b, axis=0)
+        out = Subtract()([X_b, X_a])
+
+        # Create the new model with the additional layers
+        m = tf.keras.Model(inputs=[X_input, idx_a, idx_b], outputs=out, name="RankNet_with_additional_layers")
+
+        # Return the original model as m_infer and the new model as m
+        m_infer = model
+        return m, m_infer
+
 
     # model = createPairwiseModel(config)
-    model = setup_model(config)
+    pre_model = setup_model(config)
+    model, model_infer = combine_model(pre_model)
+
     model.compile(optimizer=Adam(config['learning_rate']),
                   loss=BinaryCrossentropy(from_logits=True),
                   metrics=[BinaryAccuracy(threshold=.5)])

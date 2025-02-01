@@ -76,10 +76,20 @@ class FrankensteinLoader:
 
         return output + (idx_a, idx_b), target
 
-    def get_batch_data(self, idx_a, idx_b):
+    def get_batch_data(self, idx_a, idx_b, mode="default"):
         required_indices = np.array(list(set(idx_a + idx_b)))
         required_data = self.dataset[required_indices]
-        return required_data
+        if mode == "default":
+            return required_data
+        elif mode == "type-vstack":
+            pass # see notebook
+        elif mode == "type-hstack":
+            pass # see notebook
+        elif mode == "type-merge":
+            pass # see notebook
+
+        return None
+
 
     def load(self):
         # TODO: maybe replace with function from DisjointLoader

@@ -13,8 +13,10 @@ def _load_data(name: str):
     #     dataset = QM9(amount=10)# 1000 and 100000 ok
     if name in TUDataset.available_datasets():
         dataset = TUDataset(name)
+        config['x_shape1'] = 28
     elif name in ogb_available_datasets():
         dataset= OGBDataset(name)
+        config['x_shape1'] = 9
     else:
         raise ValueError(f'Dataset {name} unknown')
 
