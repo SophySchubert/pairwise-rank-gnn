@@ -5,10 +5,11 @@ from data.ogb_helper import ogb_available_datasets, OGBDataset
 
 from itertools import combinations
 
-def _load_data(name: str):
+def _load_data(config):
     '''
     Loads a dataset from [TUDataset, OGB]
     '''
+    name = config['dataset']
     # if name == 'QM9':
     #     dataset = QM9(amount=10)# 1000 and 100000 ok
     if name in TUDataset.available_datasets():
@@ -68,10 +69,9 @@ def check_util(data, index_a, index_b):
 def get_data(config):
     seed = config['seed']
     train_test_split = config['train_test_split']
-    name = config['dataset']
 
     # Load data
-    data, config['n_out'] = _load_data(name)
+    data, config['n_out'] = _load_data(config)
     ground_truth_ranking = _rankData(data)
     # Split data
     train_data, test_data = _split_data(data, train_test_split, seed)

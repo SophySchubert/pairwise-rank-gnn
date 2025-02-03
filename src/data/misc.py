@@ -1,6 +1,9 @@
 import networkx as nx
 from scipy.stats import kendalltau
 import numpy as np
+
+from itertools import combinations
+
 from spektral.data.loaders import tf_loader_available
 from spektral.data.utils import (
     prepend_none,
@@ -9,6 +12,8 @@ from spektral.data.utils import (
     collate_labels_disjoint,
     batch_generator
 )
+
+from spektral.data import Graph
 
 
 def spektral_graph_to_nx_graph(spektral_graph):
@@ -30,9 +35,22 @@ def compare_rankings(ranking_a, ranking_b):
     correlation_coefficient, p_value = kendalltau(ranking_a, ranking_b)
     return correlation_coefficient, p_value
 
+def sample_preference_pairs2(graphs):
+    c = [(a, b, check_util2(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
+    return np.array(c)
+
+def check_util2(data, index_a, index_b):
+    a = data[index_a]
+    b = data[index_b]
+    util_a = a.y
+    util_b = b.y
+    if util_a >= util_b:
+        return 1
+    else:
+        return 0
 
 
-class FrankensteinLoader:
+class CustomDisjointedLoader:
 
     def __init__(self, dataset, pairs_and_target, config, node_level=False, batch_size=1, epochs=None, shuffle=True):
         self.dataset = dataset
@@ -77,19 +95,22 @@ class FrankensteinLoader:
         return output + (idx_a, idx_b), target
 
     def get_batch_data(self, idx_a, idx_b, mode="default"):
-        required_indices = np.array(list(set(idx_a + idx_b)))
-        required_data = self.dataset[required_indices]
         if mode == "default":
+            required_indices = np.array(list(set(idx_a + idx_b)))
+            required_data = self.dataset[required_indices]
             return required_data
         elif mode == "type-vstack":
-            pass # see notebook
+            return merge_vstack(idx_a, idx_b, self.dataset, self.config)
         elif mode == "type-hstack":
-            pass # see notebook
-        elif mode == "type-merge":
-            pass # see notebook
-
-        return None
-
+           return merge_hstack(idx_a, idx_b, self.dataset, self.config)
+        elif mode == "type-merge-mult":
+           return merge_mult(idx_a, idx_b, self.dataset, self.config)
+        elif mode == "type-merge-add":
+            return merge_add(idx_a, idx_b, self.dataset, self.config)
+        elif mode == "type-merge-mean":
+            return merge_mean(idx_a, idx_b, self.dataset, self.config)
+        else:
+            raise ValueError(f"Mode {mode} unknown")
 
     def load(self):
         # TODO: maybe replace with function from DisjointLoader
@@ -108,3 +129,202 @@ class FrankensteinLoader:
     @property
     def steps_per_epoch(self):
         return int(np.ceil(len(self.dataset) / self.batch_size))
+
+def merge_vstack(idx_a, idx_b, dataset, config):
+    # mode=="type-vstack"
+    assert(len(idx_a)==len(idx_b))
+    graphs = []
+    for i in range(len(idx_a)):
+        g_1, g_2 = dataset[idx_a[i]], dataset[idx_b[i]]
+        assert(g_1.x.shape[1]==config['x_shape1'] and g_2.x.shape[1]==config['x_shape1'])
+        assert(g_2.e.shape[1]==3 and g_2.e.shape[1]==3)
+
+        if not (g_1.a.shape>g_2.a.shape or g_1.a.shape<g_2.a.shape):
+            a = np.vstack((g_1.a, g_2.a))
+        elif (g_1.a.shape > g_2.a.shape):
+            _a = np.pad(g_2.a, ((0, g_1.a.shape[0]-g_2.a.shape[0]), (0, g_1.a.shape[1]-g_2.a.shape[1])), mode='constant', constant_values=0)
+            a = np.vstack((g_1.a, _a))
+        elif (g_1.a.shape < g_2.a.shape):
+            _a = np.pad(g_1.a, ((0, g_2.a.shape[0]-g_1.a.shape[0]), (0, g_2.a.shape[1]-g_1.a.shape[1])), mode='constant', constant_values=0)
+            a = np.vstack((_a, g_2.a))
+
+        g_n = Graph()
+        g_n.x = np.vstack((g_1.x, g_2.x))
+        g_n.e = np.vstack((g_1.e, g_2.e))
+        g_n.a = a
+        graphs.append(g_n)
+
+    return graphs
+
+def merge_hstack(idx_a, idx_b, dataset, config):
+    # mode=="type-hstack"
+    assert(len(idx_a)==len(idx_b))
+    graphs = []
+    for i in range(len(idx_a)):
+        g_1, g_2 = dataset[idx_a[i]], dataset[idx_b[i]]
+        assert(g_1.x.shape[1]==config['x_shape1'] and g_2.x.shape[1]==config['x_shape1'])
+        assert(g_2.e.shape[1]==3 and g_2.e.shape[1]==3)
+        #a
+        if not (g_1.a.shape > g_2.a.shape or g_1.a.shape < g_2.a.shape):
+            a = np.hstack((g_1.a, g_2.a))
+        elif (g_1.a.shape > g_2.a.shape):
+            _a = np.pad(g_2.a, ((0, g_1.a.shape[0]-g_2.a.shape[0]), (0, g_1.a.shape[1]-g_2.a.shape[1])), mode='constant', constant_values=0)
+            a = np.hstack((g_1.a, _a))
+        elif (g_1.a.shape < g_2.a.shape):
+            _a = np.pad(g_1.a, ((0, g_2.a.shape[0]-g_1.a.shape[0]), (0, g_2.a.shape[1]-g_1.a.shape[1])), mode='constant', constant_values=0)
+            a = np.hstack((_a, g_2.a))
+        #x
+        if not (g_1.x.shape > g_2.x.shape or g_1.x.shape < g_2.x.shape):
+            x = np.hstack((g_1.x, g_2.x))
+        elif (g_1.x.shape > g_2.x.shape):
+            _x = np.pad(g_2.x, ((0, g_1.x.shape[0]-g_2.x.shape[0]), (0, g_1.x.shape[1]-g_2.x.shape[1])), mode='constant', constant_values=0)
+            x = np.hstack((g_1.x, _x))
+        elif (g_1.x.shape < g_2.x.shape):
+            _x = np.pad(g_1.x, ((0, g_2.x.shape[0]-g_1.x.shape[0]), (0, g_2.x.shape[1]-g_1.x.shape[1])), mode='constant', constant_values=0)
+            x = np.hstack((_x, g_2.x))
+            #e
+        if not (g_1.e.shape > g_2.e.shape or g_1.e.shape < g_2.e.shape):
+            e = np.hstack((g_1.e, g_2.e))
+        elif (g_1.e.shape > g_2.e.shape):
+            _e = np.pad(g_2.e, ((0, g_1.e.shape[0]-g_2.e.shape[0]), (0, g_1.e.shape[1]-g_2.e.shape[1])), mode='constant', constant_values=0)
+            e = np.hstack((g_1.e, _e))
+        elif (g_1.e.shape < g_2.e.shape):
+            _e = np.pad(g_1.e, ((0, g_2.e.shape[0]-g_1.e.shape[0]), (0, g_2.e.shape[1]-g_1.e.shape[1])), mode='constant', constant_values=0)
+            e = np.hstack((_e, g_2.e))
+
+        g_n = Graph()
+        g_n.x = x
+        g_n.e = e
+        g_n.a = a
+        graphs.append(g_n)
+
+    return graphs
+
+def merge_mult(idx_a, idx_b, dataset, config):
+    # mode=="type-merge-mult"
+    assert(len(idx_a)==len(idx_b))
+    graphs = []
+    for i in range(len(idx_a)):
+        g_1, g_2 = dataset[idx_a[i]], dataset[idx_b[i]]
+        assert(g_1.x.shape[1]==config['x_shape1'] and g_2.x.shape[1]==config['x_shape1'])
+        assert(g_2.e.shape[1]==3 and g_2.e.shape[1]==3)
+        #a
+        if not (g_1.a.shape > g_2.a.shape or g_1.a.shape < g_2.a.shape):
+            a = g_1.a * g_2.a
+        elif (g_1.a.shape > g_2.a.shape):
+            _a = np.pad(g_2.a, ((0, g_1.a.shape[0]-g_2.a.shape[0]), (0, g_1.a.shape[1]-g_2.a.shape[1])), mode='constant', constant_values=0)
+            a = g_1.a * _a
+        elif (g_1.a.shape < g_2.a.shape):
+            _a = np.pad(g_1.a, ((0, g_2.a.shape[0]-g_1.a.shape[0]), (0, g_2.a.shape[1]-g_1.a.shape[1])), mode='constant', constant_values=0)
+            a = _a * g_2.a
+        #x
+        if not (g_1.x.shape > g_2.x.shape or g_1.x.shape < g_2.x.shape):
+            x = g_1.x * g_2.x
+        elif (g_1.x.shape > g_2.x.shape):
+            _x = np.pad(g_2.x, ((0, g_1.x.shape[0]-g_2.x.shape[0]), (0, g_1.x.shape[1]-g_2.x.shape[1])), mode='constant', constant_values=0)
+            x = g_1.x * _x
+        elif (g_1.x.shape < g_2.x.shape):
+            _x = np.pad(g_1.x, ((0, g_2.x.shape[0]-g_1.x.shape[0]), (0, g_2.x.shape[1]-g_1.x.shape[1])), mode='constant', constant_values=0)
+            x = _x * g_2.x
+        #e
+        if not (g_1.e.shape > g_2.e.shape or g_1.e.shape < g_2.e.shape):
+            e = g_1.e * g_2.e
+        elif (g_1.e.shape > g_2.e.shape):
+            _e = np.pad(g_2.e, ((0, g_1.e.shape[0]-g_2.e.shape[0]), (0, g_1.e.shape[1]-g_2.e.shape[1])), mode='constant', constant_values=0)
+            e = g_1.e * _e
+        elif (g_1.e.shape < g_2.e.shape):
+            _e = np.pad(g_1.e, ((0, g_2.e.shape[0]-g_1.e.shape[0]), (0, g_2.e.shape[1]-g_1.e.shape[1])), mode='constant', constant_values=0)
+            e = _e * g_2.e
+        g_n = Graph()
+        g_n.a = a
+        g_n.x = x
+        g_n.e = e
+        graphs.append(g_n)
+
+    return graphs
+
+def merge_add(idx_a, idx_b, dataset, config):
+    # mode=="type-merge-add"
+    assert(len(idx_a)==len(idx_b))
+    graphs = []
+    for i in range(len(idx_a)):
+        g_1, g_2 = dataset[idx_a[i]], dataset[idx_b[i]]
+        assert(g_1.x.shape[1]==config['x_shape1'] and g_2.x.shape[1]==config['x_shape1'])
+        assert(g_2.e.shape[1]==3 and g_2.e.shape[1]==3)
+        #a
+        if not (g_1.a.shape > g_2.a.shape or g_1.a.shape < g_2.a.shape):
+            a = g_1.a + g_2.a
+        elif (g_1.a.shape > g_2.a.shape):
+            _a = np.pad(g_2.a, ((0, g_1.a.shape[0]-g_2.a.shape[0]), (0, g_1.a.shape[1]-g_2.a.shape[1])), mode='constant', constant_values=0)
+            a = g_1.a + _a
+        elif (g_1.a.shape < g_2.a.shape):
+            _a = np.pad(g_1.a, ((0, g_2.a.shape[0]-g_1.a.shape[0]), (0, g_2.a.shape[1]-g_1.a.shape[1])), mode='constant', constant_values=0)
+            a = _a + g_2.a
+        #x
+        if not (g_1.x.shape > g_2.x.shape or g_1.x.shape < g_2.x.shape):
+            x = g_1.x + g_2.x
+        elif (g_1.x.shape > g_2.x.shape):
+            _x = np.pad(g_2.x, ((0, g_1.x.shape[0]-g_2.x.shape[0]), (0, g_1.x.shape[1]-g_2.x.shape[1])), mode='constant', constant_values=0)
+            x = g_1.x + _x
+        elif (g_1.x.shape < g_2.x.shape):
+            _x = np.pad(g_1.x, ((0, g_2.x.shape[0]-g_1.x.shape[0]), (0, g_2.x.shape[1]-g_1.x.shape[1])), mode='constant', constant_values=0)
+            x = _x + g_2.x
+        #e
+        if not (g_1.e.shape > g_2.e.shape or g_1.e.shape < g_2.e.shape):
+            e = g_1.e + g_2.e
+        elif (g_1.e.shape > g_2.e.shape):
+            _e = np.pad(g_2.e, ((0, g_1.e.shape[0]-g_2.e.shape[0]), (0, g_1.e.shape[1]-g_2.e.shape[1])), mode='constant', constant_values=0)
+            e = g_1.e + _e
+        elif (g_1.e.shape < g_2.e.shape):
+            _e = np.pad(g_1.e, ((0, g_2.e.shape[0]-g_1.e.shape[0]), (0, g_2.e.shape[1]-g_1.e.shape[1])), mode='constant', constant_values=0)
+            e = _e + g_2.e
+        g_n = Graph()
+        g_n.a = a
+        g_n.x = x
+        g_n.e = e
+        graphs.append(g_n)
+
+    return graphs
+
+def merge_mean(idx_a, idx_b, dataset, config):
+    # mode=="type-merge-mean"
+    assert(len(idx_a)==len(idx_b))
+    graphs = []
+    for i in range(len(idx_a)):
+        g_1, g_2 = dataset[idx_a[i]], dataset[idx_b[i]]
+        assert(g_1.x.shape[1]==config['x_shape1'] and g_2.x.shape[1]==config['x_shape1'])
+        assert(g_2.e.shape[1]==3 and g_2.e.shape[1]==3)
+        #a
+        if not (g_1.a.shape > g_2.a.shape or g_1.a.shape < g_2.a.shape):
+            a = (g_1.a + g_2.a) // 2
+        elif (g_1.a.shape > g_2.a.shape):
+            _a = np.pad(g_2.a, ((0, g_1.a.shape[0]-g_2.a.shape[0]), (0, g_1.a.shape[1]-g_2.a.shape[1])), mode='constant', constant_values=0)
+            a = (g_1.a + _a) // 2
+        elif (g_1.a.shape < g_2.a.shape):
+            _a = np.pad(g_1.a, ((0, g_2.a.shape[0]-g_1.a.shape[0]), (0, g_2.a.shape[1]-g_1.a.shape[1])), mode='constant', constant_values=0)
+            a = (_a + g_2.a) // 2
+        #x
+        if not (g_1.x.shape > g_2.x.shape or g_1.x.shape < g_2.x.shape):
+            x = (g_1.x + g_2.x) // 2
+        elif (g_1.x.shape > g_2.x.shape):
+            _x = np.pad(g_2.x, ((0, g_1.x.shape[0]-g_2.x.shape[0]), (0, g_1.x.shape[1]-g_2.x.shape[1])), mode='constant', constant_values=0)
+            x = (g_1.x + _x) // 2
+        elif (g_1.x.shape < g_2.x.shape):
+            _x = np.pad(g_1.x, ((0, g_2.x.shape[0]-g_1.x.shape[0]), (0, g_2.x.shape[1]-g_1.x.shape[1])), mode='constant', constant_values=0)
+            x = (_x + g_2.x) // 2
+        #e
+        if not (g_1.e.shape > g_2.e.shape or g_1.e.shape < g_2.e.shape):
+            e = (g_1.e + g_2.e) // 2
+        elif (g_1.e.shape > g_2.e.shape):
+            _e = np.pad(g_2.e, ((0, g_1.e.shape[0]-g_2.e.shape[0]), (0, g_1.e.shape[1]-g_2.e.shape[1])), mode='constant', constant_values=0)
+            e = (g_1.e + _e) // 2
+        elif (g_1.e.shape < g_2.e.shape):
+            _e = np.pad(g_1.e, ((0, g_2.e.shape[0]-g_1.e.shape[0]), (0, g_2.e.shape[1]-g_1.e.shape[1])), mode='constant', constant_values=0)
+            e = (_e + g_2.e) // 2
+        g_n = Graph()
+        g_n.a = a
+        g_n.x = x
+        g_n.e = e
+        graphs.append(g_n)
+
+    return graphs

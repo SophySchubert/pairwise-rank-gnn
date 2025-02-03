@@ -4,20 +4,15 @@ import shutil
 import numpy as np
 import tensorflow as tf
 import pandas as pd
-import spektral
-from matplotlib import pyplot as plt
-from scipy.stats import kendalltau
 from tensorflow.keras.optimizers import Adam
 from keras.losses import BinaryCrossentropy, MeanSquaredError
 from keras.metrics import BinaryAccuracy
-
-from tensorflow.keras.layers import Dense
-from spektral.layers import ECCConv
+from itertools import combinations
 
 from misc import setup_experiment, setup_logger, now, setup_model
 from data.load import get_data
 from data.loader import MyDisjointLoader, CustomDataLoader
-from data.misc import FrankensteinLoader
+from data.misc import CustomDisjointedLoader, sample_preference_pairs2
 
 if __name__ == '__main__':
     start_time = time.time()
@@ -41,10 +36,10 @@ if __name__ == '__main__':
     train_graphs, test_graphs, base_ranking = get_data(config)
     print(f"len train_graphs:{len(train_graphs)}")
     # exit(1)
-    loader_tr = MyDisjointLoader(train_graphs, batch_size=config['batch_size'], epochs=config['epochs'], seed=config['seed'])
-    loader_te = MyDisjointLoader(test_graphs, batch_size=config['batch_size'], epochs=1, seed=config['seed'])
+    # loader_tr = MyDisjointLoader(train_graphs, batch_size=config['batch_size'], epochs=config['epochs'], seed=config['seed'])
+    # loader_te = MyDisjointLoader(test_graphs, batch_size=config['batch_size'], epochs=1, seed=config['seed'])
     ##############setup C#####################
-    from itertools import combinations
+
     def sample_preference_pairs(graphs):
         c = [(a, b, check_util(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
         idx_a = []
@@ -67,52 +62,24 @@ if __name__ == '__main__':
             return 0
 
     pairs, targets = sample_preference_pairs(train_graphs)
+
+    # hat den [Op:GatherV2] Fehler
     data_loader = CustomDataLoader(train_graphs, pairs, targets, batch_size=32, seed=42)
     ######## setup D############
-    def sample_preference_pairs2(graphs):
-        c = [(a, b, check_util2(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
-        return np.array(c)
+    # hat den [Op:GatherV2] Fehler
 
-    def check_util2(data, index_a, index_b):
-        a = data[index_a]
-        b = data[index_b]
-        util_a = a.y
-        util_b = b.y
-        if util_a >= util_b:
-            return 1
-        else:
-            return 0
+    pairs_and_targets_train = sample_preference_pairs2(train_graphs)
+    print(f"pairs_and_targets:{pairs_and_targets_train}")
+    data_loader_train = CustomDisjointedLoader(train_graphs, pairs_and_targets_train, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
 
-    pairs_and_targets = sample_preference_pairs2(train_graphs)
-    print(f"pairs_and_targets:{pairs_and_targets}")
-    data_loader = FrankensteinLoader(train_graphs, pairs_and_targets, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
+    pairs_and_targets_test = sample_preference_pairs2(test_graphs)
+    data_loader_test = CustomDisjointedLoader(train_graphs, pairs_and_targets_test, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
     #########
     # model #
     #########
-    def pref_lookup(X, pref_a, pref_b):
-        X_a = tf.gather(X, pref_a, axis=0)
-        X_b = tf.gather(X, pref_b, axis=0)
-        return X_a, X_b
 
-    def createPairwiseModel(config, inputs):
-        inputs = tf.keras.Input(shape=(None, None), name='inputs')
-        x, a, e, i, idx_a, idx_b = inputs#ohne batch dimension None am Anfang, anders als beim DataLoader, Input statt InputLayer
-
-        x = tf.cast(x, tf.float32)
-        a = a.with_values(tf.cast(a.values, tf.float32))
-        e = tf.cast(e, tf.float32)
-
-        conv1 = ECCConv(32, activation="relu")([x, a, e])
-        conv2 = ECCConv(32, activation="relu")([conv1, a, e])
-        x_util = Dense(config['n_out'], activation=None)(conv2)
-        X_a, X_b = pref_lookup(x_util, idx_a, idx_b)
-        out = X_b - X_a
-
-        m = tf.keras.Model(inputs=[x, a, e, idx_a, idx_b], outputs=out, name="RankNet")
-        m_infer = tf.keras.Model(inputs=[x, a, e], outputs=x_util, name="RankNet_predictor")
-        return m, m_infer
     def combine_model(model):
-        from tensorflow.keras.layers import Dense, Subtract
+        from tensorflow.keras.layers import Subtract, Activation
         # Extract the input and output from the given model
         X_input = model()
         X_util = model.output
@@ -123,9 +90,10 @@ if __name__ == '__main__':
         X_a = tf.gather(X_util, idx_a, axis=0)
         X_b = tf.gather(X_util, idx_b, axis=0)
         out = Subtract()([X_b, X_a])
+        out = Activation('sigmoid')(out)
 
         # Create the new model with the additional layers
-        m = tf.keras.Model(inputs=[X_input, idx_a, idx_b], outputs=out, name="RankNet_with_additional_layers")
+        m = tf.keras.Model(inputs=[X_input, idx_a, idx_b], outputs=out, name="PairwiseModel")
 
         # Return the original model as m_infer and the new model as m
         m_infer = model
@@ -134,7 +102,8 @@ if __name__ == '__main__':
 
     # model = createPairwiseModel(config)
     pre_model = setup_model(config)
-    model, model_infer = combine_model(pre_model)
+    #model, model_infer = combine_model(pre_model)
+    model = pre_model
 
     model.compile(optimizer=Adam(config['learning_rate']),
                   loss=BinaryCrossentropy(from_logits=True),
@@ -149,7 +118,7 @@ if __name__ == '__main__':
     # Evaluate model
     ################################################################################
     logger.info("Testing model")
-    loss, acc = model.evaluate(loader_te.load(), steps=loader_te.steps_per_epoch)
+    loss, acc = model.evaluate(data_loader_test.load(), steps=data_loader_test.steps_per_epoch)
     logger.info(f"Done. Test loss: {loss} - Test Accuracy: {acc}")
 
 

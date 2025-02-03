@@ -158,7 +158,7 @@ class CustomDataLoader(tf.keras.utils.Sequence):
         print(len(output))
         print(output)
 
-        return output, batch_targets
+        return output, batch_targets #mit yield den Fehler:ValueError: not enough values to unpack (expected 6, got 1)
 
     def on_epoch_end(self):
         print("CustomDataLoader.on_epoch_end")

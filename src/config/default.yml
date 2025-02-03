@@ -7,9 +7,7 @@ seed: 1
 epochs: 1
 batch_size: 32
 learning_rate: 0.01
-model: prgnn # general_gnn, direct_ranker, prgnn
-dataset: ogbg-molesol #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full | NEIN: QM9, aspirin
+model: prgnn #JA: prgnn | NEIN: general_gnn, direct_ranker
+dataset: ogbg-mollipo #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full | NEIN: QM9, aspirin
 train_test_split: 0.8
-hidden_layers: 4
-convolution_neurons: 128
-pairwise: 1
+mode: default # default, type-vstack, type-hstack, type-merge-mult, type-merge-add, type-merge-mean
