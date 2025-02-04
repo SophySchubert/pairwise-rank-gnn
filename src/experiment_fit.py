@@ -36,8 +36,8 @@ if __name__ == '__main__':
     train_graphs, test_graphs, base_ranking = get_data(config)
     print(f"len train_graphs:{len(train_graphs)}")
     # exit(1)
-    # loader_tr = MyDisjointLoader(train_graphs, batch_size=config['batch_size'], epochs=config['epochs'], seed=config['seed'])
-    # loader_te = MyDisjointLoader(test_graphs, batch_size=config['batch_size'], epochs=1, seed=config['seed'])
+    loader_tr = MyDisjointLoader(train_graphs, batch_size=config['batch_size'], epochs=config['epochs'], seed=config['seed'])
+    loader_te = MyDisjointLoader(test_graphs, batch_size=config['batch_size'], epochs=1, seed=config['seed'])
     ##############setup C#####################
 
     def sample_preference_pairs(graphs):
@@ -61,49 +61,61 @@ if __name__ == '__main__':
         else:
             return 0
 
-    pairs, targets = sample_preference_pairs(train_graphs)
+    # pairs, targets = sample_preference_pairs(train_graphs)
 
-    # hat den [Op:GatherV2] Fehler
-    data_loader = CustomDataLoader(train_graphs, pairs, targets, batch_size=32, seed=42)
+    ## hat den [Op:GatherV2] Fehler
+    # data_loader = CustomDataLoader(train_graphs, pairs, targets, batch_size=32, seed=42)
+
     ######## setup D############
     # hat den [Op:GatherV2] Fehler
 
-    pairs_and_targets_train = sample_preference_pairs2(train_graphs)
-    print(f"pairs_and_targets:{pairs_and_targets_train}")
-    data_loader_train = CustomDisjointedLoader(train_graphs, pairs_and_targets_train, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
+    # pairs_and_targets_train = sample_preference_pairs2(train_graphs)
+    # print(f"pairs_and_targets:{pairs_and_targets_train}")
+    # data_loader_train = CustomDisjointedLoader(train_graphs, pairs_and_targets_train, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
+    #
+    # pairs_and_targets_test = sample_preference_pairs2(test_graphs)
+    # data_loader_test = CustomDisjointedLoader(train_graphs, pairs_and_targets_test, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
 
-    pairs_and_targets_test = sample_preference_pairs2(test_graphs)
-    data_loader_test = CustomDisjointedLoader(train_graphs, pairs_and_targets_test, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
     #########
     # model #
     #########
+    def pref_lookup(X, pref_a, pref_b):
+        X_a = tf.gather(X, pref_a, axis=0)
+        X_b = tf.gather(X, pref_b, axis=0)
 
-    def combine_model(model):
-        from tensorflow.keras.layers import Subtract, Activation
-        # Extract the input and output from the given model
-        X_input = model()
-        X_util = model.output
+        return X_a, X_b
 
-        # Define the additional layers
-        idx_a = tf.keras.Input(shape=(None,), name='idx_a')
-        idx_b = tf.keras.Input(shape=(None,), name='idx_b')
-        X_a = tf.gather(X_util, idx_a, axis=0)
-        X_b = tf.gather(X_util, idx_b, axis=0)
-        out = Subtract()([X_b, X_a])
-        out = Activation('sigmoid')(out)
+    def combine_model(config):
+        from tensorflow.keras.layers import Input, Dense, Subtract, Activation
+        from spektral.layers import ECCConv
+
+        x_in = Input(shape=(None,9))
+        a_in = Input(shape=(None,None))
+        e_in = Input(shape=(None,3))
+        i_in = Input(shape=(None,1))#can be ignored
+        idx_a = Input(shape=(None,1), dtype=tf.int32)
+        idx_b = Input(shape=(None,1), dtype=tf.int32)
+
+        # x_in = tf.cast(x_in, tf.float32)
+        # a_in = tf.cast(a_in, tf.float32) #a_in.with_values(tf.cast(a_in.values, tf.float32))
+        # e_in = tf.cast(e_in, tf.float32)
+
+        outs = ECCConv(32, activation='relu')([x_in, a_in, e_in])
+        outs = ECCConv(32, activation='relu')([outs, a_in, e_in])
+        X_util = Dense(config['n_out'], activation=None)(outs)
+
+        X_a, X_b = pref_lookup(X_util, idx_a, idx_b)
+        out = X_b - X_a
 
         # Create the new model with the additional layers
-        m = tf.keras.Model(inputs=[X_input, idx_a, idx_b], outputs=out, name="PairwiseModel")
+        # m_infer = tf.keras.Model(inputs=[x_in, a_in, e_in, i_in], outputs=X_util, name="InferenceModel")
+        m = tf.keras.Model(inputs=[x_in, a_in, e_in, i_in, idx_a, idx_b], outputs=out, name="PairwiseModel")
 
-        # Return the original model as m_infer and the new model as m
-        m_infer = model
-        return m, m_infer
+        return m#, m_infer
 
 
-    # model = createPairwiseModel(config)
-    pre_model = setup_model(config)
-    #model, model_infer = combine_model(pre_model)
-    model = pre_model
+    model= combine_model(config) #, model_infer
+    #model = setup_model(config)
 
     model.compile(optimizer=Adam(config['learning_rate']),
                   loss=BinaryCrossentropy(from_logits=True),
@@ -113,12 +125,12 @@ if __name__ == '__main__':
     ################################################################################
     # Fit model
     ################################################################################
-    hs = model.fit(data_loader, epochs=config['epochs'], verbose=1)
+    hs = model.fit(loader_tr.load(), epochs=config['epochs'], verbose=1)
     ################################################################################
     # Evaluate model
     ################################################################################
     logger.info("Testing model")
-    loss, acc = model.evaluate(data_loader_test.load(), steps=data_loader_test.steps_per_epoch)
+    loss, acc = model.evaluate(loader_te.load(), steps=loader_te.steps_per_epoch)
     logger.info(f"Done. Test loss: {loss} - Test Accuracy: {acc}")
 
 

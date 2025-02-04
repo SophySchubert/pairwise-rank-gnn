@@ -58,6 +58,8 @@ class MyDisjointLoader(DisjointLoader):
 
         output = to_disjoint(**packed)
         output = sp_matrices_to_sp_tensors(output)
+        # print("##############################################")
+        # print(target.shape)
 
         return output + (idx_a, idx_b), target
 
