@@ -69,12 +69,12 @@ if __name__ == '__main__':
     ######## setup D############
     # hat den [Op:GatherV2] Fehler
 
-    # pairs_and_targets_train = sample_preference_pairs2(train_graphs)
-    # print(f"pairs_and_targets:{pairs_and_targets_train}")
-    # data_loader_train = CustomDisjointedLoader(train_graphs, pairs_and_targets_train, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
-    #
-    # pairs_and_targets_test = sample_preference_pairs2(test_graphs)
-    # data_loader_test = CustomDisjointedLoader(train_graphs, pairs_and_targets_test, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
+    pairs_and_targets_train = sample_preference_pairs2(train_graphs)
+    print(f"pairs_and_targets:{pairs_and_targets_train}")
+    data_loader_train = CustomDisjointedLoader(train_graphs, pairs_and_targets_train, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
+
+    pairs_and_targets_test = sample_preference_pairs2(test_graphs)
+    data_loader_test = CustomDisjointedLoader(test_graphs, pairs_and_targets_test, config, node_level=False, batch_size=config['batch_size'], epochs=1, shuffle=True)
 
     #########
     # model #
@@ -114,8 +114,8 @@ if __name__ == '__main__':
         return m#, m_infer
 
 
-    model= combine_model(config) #, model_infer
-    #model = setup_model(config)
+    #model= combine_model(config) #, model_infer
+    model = setup_model(config)
 
     model.compile(optimizer=Adam(config['learning_rate']),
                   loss=BinaryCrossentropy(from_logits=True),
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     ################################################################################
     # Fit model
     ################################################################################
-    hs = model.fit(loader_tr.load(), epochs=config['epochs'], verbose=1)
+    hs = model.fit(data_loader_train.load(), epochs=config['epochs'], verbose=1)
     ################################################################################
     # Evaluate model
     ################################################################################

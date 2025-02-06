@@ -81,6 +81,10 @@ class CustomDisjointedLoader:
     def collate(self, batch):
         print(f"batch:{batch}")
         idx_a, idx_b, target = zip(*[(x[0], x[1], x[2]) for x in batch])
+        # print(f"idx_a{np.array(idx_a)}")
+        # print(f"idx_a{np.array(idx_a) % self.config['batch_size']}")
+        # print(f"idx_a{np.array(idx_b)}")
+        # print(f"idx_b{np.array(idx_b) % self.config['batch_size']}")
         batch = self.get_batch_data(idx_a, idx_b)
         packed = self.pack(batch)
 
@@ -90,7 +94,7 @@ class CustomDisjointedLoader:
 
         output = to_disjoint(**packed)
         output = sp_matrices_to_sp_tensors(output)
-        print(f"output:{output + (idx_a, idx_b)}")
+        #print(f"output:{output + (idx_a, idx_b)}")
 
         return output + (idx_a, idx_b), target
 
