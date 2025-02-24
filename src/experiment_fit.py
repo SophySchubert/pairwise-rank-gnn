@@ -93,8 +93,8 @@ if __name__ == '__main__':
         a_in = Input(shape=(None,None))
         e_in = Input(shape=(None,3))
         i_in = Input(shape=(None,1))#can be ignored
-        idx_a = Input(shape=(None,1), dtype=tf.int32)
-        idx_b = Input(shape=(None,1), dtype=tf.int32)
+        idx_a = Input(shape=(None,), dtype=tf.int32)
+        idx_b = Input(shape=(None,), dtype=tf.int32)
 
         # x_in = tf.cast(x_in, tf.float32)
         # a_in = tf.cast(a_in, tf.float32) #a_in.with_values(tf.cast(a_in.values, tf.float32))
@@ -138,4 +138,25 @@ if __name__ == '__main__':
     ###############################################################################
     df = pd.DataFrame({'loss': hs.history['loss'], 'binary_accuracy': hs.history['binary_accuracy']})
     df.to_csv(config['folder_path'] + '/loss_acc.csv', index=False)
+    ###############################################################################
+    # import not matplotlib.pyplot as plt
+    # fig, ax1 = plt.subplots()
+    #
+    # # Plot loss
+    # ax1.set_xlabel('Epochs')
+    # ax1.set_ylabel('Loss', color='tab:red')
+    # ax1.plot(range(1, len(epoch_loss) + 1), epoch_loss, color='tab:red', label='Loss')
+    # ax1.tick_params(axis='y', labelcolor='tab:red')
+    #
+    # # Create a second y-axis for accuracy
+    # ax2 = ax1.twinx()
+    # ax2.set_ylabel('Accuracy', color='tab:blue')
+    # ax2.plot(range(1, len(epoch_acc) + 1), epoch_acc, color='tab:blue', label='Accuracy')
+    # ax2.tick_params(axis='y', labelcolor='tab:blue')
+    #
+    # # Add a title and show the plot
+    # fig.suptitle('Training Loss and Accuracy per Epoch')
+    # fig.tight_layout()
+    # plt.savefig(config['folder_path'] + '/loss_acc.png')
+    # plt.show()
 

@@ -30,8 +30,8 @@ class PRGNN(tf.keras.Model):
         X = self.conv1([x, a, e])
         X = self.conv2([X, a, e])
         X_util = self.dense(X)
-        # print(f"x_util:{X_util}")
-        # print(f"len x_util:{len(X_util)}")
+        print(f"x_util shape:{X_util.shape}")
+        print(f"len x_util:{len(X_util)}")
         X_a, X_b = self.pref_lookup(X_util, idx_a, idx_b)
         # print(f"pref_lookup output:{X_b - X_a}")
         # out = self.subtract([X_b, X_a])
@@ -47,8 +47,8 @@ class PRGNN(tf.keras.Model):
         # return X_b - X_a, X_util
 
     def pref_lookup(self, X, pref_a, pref_b):
-        # print(f"pref_a:{pref_a}")
-        # print(f"pref_b:{pref_b}")
+        print(f"pref_a:{pref_a}")
+        print(f"pref_b:{pref_b}")
 
         X_a = tf.gather(X, pref_a, axis=0)
         X_b = tf.gather(X, pref_b, axis=0)
