@@ -14,6 +14,7 @@ from spektral.data.utils import (
 )
 
 from spektral.data import Graph
+import tensorflow as tf
 
 
 def spektral_graph_to_nx_graph(spektral_graph):
@@ -86,6 +87,7 @@ class CustomDisjointedLoader:
         # print(f"idx_a{np.array(idx_b)}")
         # print(f"idx_b{np.array(idx_b) % self.config['batch_size']}")
         batch = self.get_batch_data(idx_a, idx_b)
+        idx_a, idx_b = self.create_index_mapping(idx_a, idx_b)
         packed = self.pack(batch)
 
         y = packed.pop("y_list", None)
@@ -115,6 +117,19 @@ class CustomDisjointedLoader:
             return merge_mean(idx_a, idx_b, self.dataset, self.config)
         else:
             raise ValueError(f"Mode {mode} unknown")
+
+    def create_index_mapping(self, a,b):
+        combined = np.concatenate((a, b))
+        unique_elements = np.unique(combined)
+
+        # Create a mapping from unique elements to the range [0, length)
+        mapping = {element: idx for idx, element in enumerate(unique_elements)}
+
+        # Apply the mapping to both arrays
+        mapped_a = np.array([mapping[element] for element in a])
+        mapped_b = np.array([mapping[element] for element in b])
+
+        return mapped_a, mapped_b
 
     def load(self):
         # TODO: maybe replace with function from DisjointLoader

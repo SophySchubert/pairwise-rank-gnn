@@ -16,6 +16,7 @@ class PRGNN(tf.keras.Model):
         # print(f"inputs:{inputs}")
         # exit(1)
         x, a, e, i, idx_a, idx_b = inputs
+        print(f"x shape:{x.shape}")
 
         x = tf.cast(x, tf.float32)
         # a = a.with_values(tf.cast(a.values, tf.float32))
@@ -30,8 +31,8 @@ class PRGNN(tf.keras.Model):
         X = self.conv1([x, a, e])
         X = self.conv2([X, a, e])
         X_util = self.dense(X)
-        print(f"x_util shape:{X_util.shape}")
-        print(f"len x_util:{len(X_util)}")
+        # print(f"x_util shape:{X_util.shape}")
+        # print(f"len x_util:{len(X_util)}")
         X_a, X_b = self.pref_lookup(X_util, idx_a, idx_b)
         # print(f"pref_lookup output:{X_b - X_a}")
         # out = self.subtract([X_b, X_a])
