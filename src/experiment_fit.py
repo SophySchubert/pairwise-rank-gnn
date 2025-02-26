@@ -13,6 +13,7 @@ from misc import setup_experiment, setup_logger, now, setup_model
 from data.load import get_data
 from data.loader import MyDisjointLoader, CustomDataLoader
 from data.misc import CustomDisjointedLoader, sample_preference_pairs2
+from scipy.stats import rankdata
 
 if __name__ == '__main__':
     start_time = time.time()
@@ -70,7 +71,7 @@ if __name__ == '__main__':
     # hat den [Op:GatherV2] Fehler
 
     pairs_and_targets_train = sample_preference_pairs2(train_graphs)
-    print(f"pairs_and_targets:{pairs_and_targets_train}")
+    # print(f"pairs_and_targets:{pairs_and_targets_train}")
     data_loader_train = CustomDisjointedLoader(train_graphs, pairs_and_targets_train, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
 
     pairs_and_targets_test = sample_preference_pairs2(test_graphs)
@@ -108,36 +109,44 @@ if __name__ == '__main__':
         out = X_b - X_a
 
         # Create the new model with the additional layers
-        # m_infer = tf.keras.Model(inputs=[x_in, a_in, e_in, i_in], outputs=X_util, name="InferenceModel")
+        m_infer = tf.keras.Model(inputs=[x_in, a_in, e_in, i_in, idx_a, idx_b], outputs=X_util, name="InferenceModel")
         m = tf.keras.Model(inputs=[x_in, a_in, e_in, i_in, idx_a, idx_b], outputs=out, name="PairwiseModel")
 
-        return m#, m_infer
+        return m, m_infer
 
 
-    #model= combine_model(config) #, model_infer
-    model = setup_model(config)
+    model, model_infer = combine_model(config) #
+    # model = setup_model(config)
 
     model.compile(optimizer=Adam(config['learning_rate']),
                   loss=BinaryCrossentropy(from_logits=True),
-                  metrics=[BinaryAccuracy(threshold=.5)])
+                  metrics=[BinaryAccuracy(threshold=.5)],
+                  # run_eagerly=True
+                  )
 
 
     ################################################################################
     # Fit model
     ################################################################################
+    # hs = model.fit(loader_tr.load(), epochs=config['epochs'], verbose=1)
     hs = model.fit(data_loader_train.load(), epochs=config['epochs'], verbose=1)
     ################################################################################
     # Evaluate model
     ################################################################################
-    logger.info("Testing model")
-    loss, acc = model.evaluate(loader_te.load(), steps=loader_te.steps_per_epoch)
-    logger.info(f"Done. Test loss: {loss} - Test Accuracy: {acc}")
+    # logger.info("Testing model")
+    # pred_utils = model_infer.predict(loader_te.load(), steps=loader_te.steps_per_epoch)
+    #TODO: ranking von scipy einbauen wie in load.py
+
+    # print("end1")
+    # print(pred_utils.shape)
+    # print("end2")
+    # logger.info(f"Done. Test loss: {loss} - Test Accuracy: {acc}")
 
 
     logger.info("--- %s seconds ---" % (time.time() - start_time))
     ###############################################################################
-    df = pd.DataFrame({'loss': hs.history['loss'], 'binary_accuracy': hs.history['binary_accuracy']})
-    df.to_csv(config['folder_path'] + '/loss_acc.csv', index=False)
+    # df = pd.DataFrame({'loss': hs.history['loss'], 'binary_accuracy': hs.history['binary_accuracy']})
+    # df.to_csv(config['folder_path'] + '/loss_acc.csv', index=False)
     ###############################################################################
     # import not matplotlib.pyplot as plt
     # fig, ax1 = plt.subplots()

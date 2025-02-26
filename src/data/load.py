@@ -5,6 +5,8 @@ from data.ogb_helper import ogb_available_datasets, OGBDataset
 
 from itertools import combinations
 
+from scipy.stats import rankdata
+
 def _load_data(config):
     '''
     Loads a dataset from [TUDataset, OGB]
@@ -35,14 +37,9 @@ def _split_data(data, train_test_split, seed):
     return train, test
 
 def _rankData(data):
-    indexed_graphs= list(enumerate(data))
+    ys = [g.y for g in data]
 
-    sorted_indexed_graphs = sorted(indexed_graphs, key=lambda x: x[1].y)
-
-    sorted_graphs = [g for index, g in sorted_indexed_graphs]
-    original_indices = [index for index, g in sorted_indexed_graphs]
-
-    return original_indices#zip(sorted_graphs, original_indices)
+    return rankdata(ys, method='dense')
 
 def sample_preference_pairs(graphs):
     c = [(a, b, check_util(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
@@ -72,8 +69,10 @@ def get_data(config):
 
     # Load data
     data, config['n_out'] = _load_data(config)
-    ground_truth_ranking = _rankData(data)
     # Split data
     train_data, test_data = _split_data(data, train_test_split, seed)
+    print("len test_data:", len(test_data))
+
+    ground_truth_ranking = _rankData(test_data)
 
     return train_data, test_data, ground_truth_ranking
