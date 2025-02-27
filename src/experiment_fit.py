@@ -1,149 +1,256 @@
-import sys
 import time
-import shutil
 import numpy as np
-import tensorflow as tf
-import pandas as pd
-from tensorflow.keras.optimizers import Adam
-from keras.losses import BinaryCrossentropy, MeanSquaredError
-from keras.metrics import BinaryAccuracy
-from itertools import combinations
+import torch
+from torch_geometric.datasets import TUDataset
+from torch_geometric.loader import DataLoader
+import torch.nn.functional as F
+from torch_geometric.nn import GCNConv, global_mean_pool
 
-from misc import setup_experiment, setup_logger, now, setup_model
-from data.load import get_data
-from data.loader import MyDisjointLoader, CustomDataLoader
-from data.misc import CustomDisjointedLoader, sample_preference_pairs2
-from scipy.stats import rankdata
 
 if __name__ == '__main__':
     start_time = time.time()
     ######################################################################
     # SETUP
-    physical_devices = tf.config.list_physical_devices('GPU')
-    if len(physical_devices) > 0:
-        tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    # config = setup_experiment(sys.argv[1])
+    # logger = setup_logger(config['folder_path'])
+    #
+    # logger.info(f"Starting at {now()}")
+    # logger.info(f"Experiment saved in {config['folder_path']}")
+    SEED = 42
+    BATCH_SIZE = 64
+    EPOCHS = 5
+    LEARNING_RATE = 1e-3
+    VALID_SPLIT = 0.8
+    TEST_SPLIT = 0.1
 
-    config = setup_experiment(sys.argv[1])
-    logger = setup_logger(config['folder_path'])
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
 
-    logger.info(f"Starting at {now()}")
-    logger.info(f"Experiment saved in {config['folder_path']}")
-    np.random.seed(config['seed'])
-    tf.random.set_seed(config['seed'])
-    shutil.copy('src/models/prgnn.py', config['folder_path']+'/model.py')
+    # shutil.copy('src/models/prgnn.py', config['folder_path']+'/model.py')
     ######################################################################
 
     # Load data and split it in train and test sets
-    train_graphs, test_graphs, base_ranking = get_data(config)
-    print(f"len train_graphs:{len(train_graphs)}")
-    # exit(1)
-    loader_tr = MyDisjointLoader(train_graphs, batch_size=config['batch_size'], epochs=config['epochs'], seed=config['seed'])
-    loader_te = MyDisjointLoader(test_graphs, batch_size=config['batch_size'], epochs=1, seed=config['seed'])
-    ##############setup C#####################
+    # train_graphs, test_graphs, base_ranking = get_data(config)
+    # print(f"len train_graphs:{len(train_graphs)}")
+    #
+    #
+    # pairs_and_targets_train = sample_preference_pairs2(train_graphs)
 
-    def sample_preference_pairs(graphs):
-        c = [(a, b, check_util(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
-        idx_a = []
-        idx_b = []
-        target = []
-        for id_a, id_b, t in c:
-            idx_a.append(id_a)
-            idx_b.append(id_b)
-            target.append(t)
-        return np.array(list(zip(idx_a,idx_b))), np.array(target).reshape(-1)
+    dataset = TUDataset(root='/tmp/aspirin', name='aspirin', use_node_attr=True)
 
-    def check_util(data, index_a, index_b):
-        a = data[index_a]
-        b = data[index_b]
-        util_a = a.y
-        util_b = b.y
-        if util_a >= util_b:
-            return 1
-        else:
-            return 0
+    # Split the dataset into training, validation, and test sets
+    train_size = int(VALID_SPLIT * len(dataset))
+    valid_size = int(TEST_SPLIT * len(dataset))
+    test_size = len(dataset) - train_size - valid_size
+    # Split the dataset
+    train_dataset, valid_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size, test_size])
 
-    # pairs, targets = sample_preference_pairs(train_graphs)
-
-    ## hat den [Op:GatherV2] Fehler
-    # data_loader = CustomDataLoader(train_graphs, pairs, targets, batch_size=32, seed=42)
-
-    ######## setup D############
-    # hat den [Op:GatherV2] Fehler
-
-    pairs_and_targets_train = sample_preference_pairs2(train_graphs)
-    # print(f"pairs_and_targets:{pairs_and_targets_train}")
-    data_loader_train = CustomDisjointedLoader(train_graphs, pairs_and_targets_train, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
-
-    pairs_and_targets_test = sample_preference_pairs2(test_graphs)
-    data_loader_test = CustomDisjointedLoader(test_graphs, pairs_and_targets_test, config, node_level=False, batch_size=config['batch_size'], epochs=1, shuffle=True)
-
-    #########
-    # model #
-    #########
-    def pref_lookup(X, pref_a, pref_b):
-        X_a = tf.gather(X, pref_a, axis=0)
-        X_b = tf.gather(X, pref_b, axis=0)
-
-        return X_a, X_b
-
-    def combine_model(config):
-        from tensorflow.keras.layers import Input, Dense, Subtract, Activation
-        from spektral.layers import ECCConv
-
-        x_in = Input(shape=(None,9))
-        a_in = Input(shape=(None,None))
-        e_in = Input(shape=(None,3))
-        i_in = Input(shape=(None,1))#can be ignored
-        idx_a = Input(shape=(None,), dtype=tf.int32)
-        idx_b = Input(shape=(None,), dtype=tf.int32)
-
-        # x_in = tf.cast(x_in, tf.float32)
-        # a_in = tf.cast(a_in, tf.float32) #a_in.with_values(tf.cast(a_in.values, tf.float32))
-        # e_in = tf.cast(e_in, tf.float32)
-
-        outs = ECCConv(32, activation='relu')([x_in, a_in, e_in])
-        outs = ECCConv(32, activation='relu')([outs, a_in, e_in])
-        X_util = Dense(config['n_out'], activation=None)(outs)
-
-        X_a, X_b = pref_lookup(X_util, idx_a, idx_b)
-        out = X_b - X_a
-
-        # Create the new model with the additional layers
-        m_infer = tf.keras.Model(inputs=[x_in, a_in, e_in, i_in, idx_a, idx_b], outputs=X_util, name="InferenceModel")
-        m = tf.keras.Model(inputs=[x_in, a_in, e_in, i_in, idx_a, idx_b], outputs=out, name="PairwiseModel")
-
-        return m, m_infer
+    # Create data loaders
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 
-    model, model_infer = combine_model(config) #
-    # model = setup_model(config)
+    class GCN(torch.nn.Module):
+        def __init__(self):
+            super(GCN, self).__init__()
+            self.conv1 = GCNConv(dataset.num_node_features, 64)
+            self.conv2 = GCNConv(64, 64)
+            self.fc = torch.nn.Linear(64, 1)  # Output 1 for regression
 
-    model.compile(optimizer=Adam(config['learning_rate']),
-                  loss=BinaryCrossentropy(from_logits=True),
-                  metrics=[BinaryAccuracy(threshold=.5)],
-                  # run_eagerly=True
-                  )
-
-
-    ################################################################################
-    # Fit model
-    ################################################################################
-    # hs = model.fit(loader_tr.load(), epochs=config['epochs'], verbose=1)
-    hs = model.fit(data_loader_train.load(), epochs=config['epochs'], verbose=1)
-    ################################################################################
-    # Evaluate model
-    ################################################################################
-    # logger.info("Testing model")
-    # pred_utils = model_infer.predict(loader_te.load(), steps=loader_te.steps_per_epoch)
-    #TODO: ranking von scipy einbauen wie in load.py
-
-    # print("end1")
-    # print(pred_utils.shape)
-    # print("end2")
-    # logger.info(f"Done. Test loss: {loss} - Test Accuracy: {acc}")
+        def forward(self, data):
+            x, edge_index, batch = data.x, data.edge_index, data.batch
+            x = self.conv1(x, edge_index)
+            x = F.relu(x)
+            x = self.conv2(x, edge_index)
+            x = torch.nn.functional.relu(x)
+            x = global_mean_pool(x, batch)  # Aggregate node features to graph level
+            x = self.fc(x)
+            return x
 
 
-    logger.info("--- %s seconds ---" % (time.time() - start_time))
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = GCN().to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    criterion = torch.nn.MSELoss()
+
+
+    def train():
+        model.train()
+        for data in train_loader:
+            data = data.to(device)
+            optimizer.zero_grad()
+            out = model(data)
+            loss = criterion(out, data.y.view(-1, 1))  # Ensure target shape matches output shape
+            loss.backward()
+            optimizer.step()
+
+
+    def evaluate(loader):
+        model.eval()
+        error = 0
+        with torch.no_grad():
+            for data in loader:
+                data = data.to(device)
+                out = model(data)
+                error += criterion(out, data.y.view(-1, 1)).item()  # Ensure target shape matches output shape
+        return error / len(loader)
+
+
+    for epoch in range(5):
+        train()
+        train_error = evaluate(train_loader)
+        valid_error = evaluate(valid_loader)
+        print(f'Epoch: {epoch + 1}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}')
+
+    test_error = evaluate(test_loader)
+    print(f'Test Error: {test_error:.4f}')
+    print("Done!")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # data_loader_train = CustomDisjointedLoader(train_graphs, pairs_and_targets_train, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
+    #
+    # pairs_and_targets_test = sample_preference_pairs2(test_graphs)
+    # data_loader_test = CustomDisjointedLoader(test_graphs, pairs_and_targets_test, config, node_level=False, batch_size=config['batch_size'], epochs=1, shuffle=True)
+    #
+    # #########
+    # # model #
+    # #########
+    # def pref_lookup(X, pref_a, pref_b):
+    #     X_a = tf.gather(X, pref_a, axis=0)
+    #     X_b = tf.gather(X, pref_b, axis=0)
+    #
+    #     return X_a, X_b
+    #
+    # def combine_model(config):
+    #     from tensorflow.keras.layers import Input, Dense, Subtract, Activation
+    #     from spektral.layers import ECCConv
+    #
+    #     x_in = Input(shape=(None,9))
+    #     a_in = Input(shape=(None,None))
+    #     e_in = Input(shape=(None,3))
+    #     i_in = Input(shape=(None,1))#can be ignored
+    #     idx_a = Input(shape=(None,), dtype=tf.int32)
+    #     idx_b = Input(shape=(None,), dtype=tf.int32)
+    #
+    #     # x_in = tf.cast(x_in, tf.float32)
+    #     # a_in = tf.cast(a_in, tf.float32) #a_in.with_values(tf.cast(a_in.values, tf.float32))
+    #     # e_in = tf.cast(e_in, tf.float32)
+    #
+    #     outs = ECCConv(32, activation='relu')([x_in, a_in, e_in])
+    #     outs = ECCConv(32, activation='relu')([outs, a_in, e_in])
+    #     X_util = Dense(config['n_out'], activation=None)(outs)
+    #
+    #     X_a, X_b = pref_lookup(X_util, idx_a, idx_b)
+    #     out = X_b - X_a
+    #
+    #     # Create the new model with the additional layers
+    #     m_infer = tf.keras.Model(inputs=[x_in, a_in, e_in, i_in, idx_a, idx_b], outputs=X_util, name="InferenceModel")
+    #     m = tf.keras.Model(inputs=[x_in, a_in, e_in, i_in, idx_a, idx_b], outputs=out, name="PairwiseModel")
+    #
+    #     return m, m_infer
+    #
+    #
+    # model, model_infer = combine_model(config) #
+    # # model = setup_model(config)
+    #
+    # model.compile(optimizer=Adam(config['learning_rate']),
+    #               loss=BinaryCrossentropy(from_logits=True),
+    #               metrics=[BinaryAccuracy(threshold=.5)],
+    #               # run_eagerly=True
+    #               )
+    #
+    #
+    # ################################################################################
+    # # Fit model
+    # ################################################################################
+    # # hs = model.fit(loader_tr.load(), epochs=config['epochs'], verbose=1)
+    # hs = model.fit(data_loader_train.load(), epochs=config['epochs'], verbose=1)
+    # ################################################################################
+    # # Evaluate model
+    # ################################################################################
+    # # logger.info("Testing model")
+    # # pred_utils = model_infer.predict(loader_te.load(), steps=loader_te.steps_per_epoch)
+    # #TODO: ranking von scipy einbauen wie in load.py
+    #
+    # # print("end1")
+    # # print(pred_utils.shape)
+    # # print("end2")
+    # # logger.info(f"Done. Test loss: {loss} - Test Accuracy: {acc}")
+
+
+    # logger.info("--- %s seconds ---" % (time.time() - start_time))
     ###############################################################################
     # df = pd.DataFrame({'loss': hs.history['loss'], 'binary_accuracy': hs.history['binary_accuracy']})
     # df.to_csv(config['folder_path'] + '/loss_acc.csv', index=False)
