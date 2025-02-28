@@ -2,10 +2,12 @@ import time
 import numpy as np
 import torch
 from torch_geometric.datasets import TUDataset
-from torch_geometric.loader import DataLoader
+from ogb.graphproppred import PygGraphPropPredDataset
+# from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, global_mean_pool
-
+from itertools import combinations
+from torch.utils.data import DataLoader
 
 if __name__ == '__main__':
     start_time = time.time()
@@ -14,7 +16,7 @@ if __name__ == '__main__':
     # config = setup_experiment(sys.argv[1])
     # logger = setup_logger(config['folder_path'])
     #
-    # logger.info(f"Starting at {now()}")
+    print(f"Starting at {start_time}")
     # logger.info(f"Experiment saved in {config['folder_path']}")
     SEED = 42
     BATCH_SIZE = 64
@@ -35,8 +37,83 @@ if __name__ == '__main__':
     #
     #
     # pairs_and_targets_train = sample_preference_pairs2(train_graphs)
+    class CustomDataLoader(DataLoader):
+        def __init__(self, pairs_and_targets, dataset, batch_size=1, shuffle=False, **kwargs):
+            super().__init__(pairs_and_targets, batch_size=batch_size, shuffle=shuffle, **kwargs)
+            self.entire_dataset = dataset
 
-    dataset = TUDataset(root='/tmp/aspirin', name='aspirin', use_node_attr=True)
+        def __iter__(self):
+            for batch in super().__iter__():
+                batch = self.augment_batch(batch)
+                yield batch
+
+        def augment_batch(self, batch):
+            # batch is a list of pairs and targets
+            idx_a, idx_b, target = zip(*[(x[0], x[1], x[2]) for x in batch])
+            data = self.get_data_from_indices(idx_a, idx_b)
+            idx_a, idx_b = self.reindex_ids(idx_a, idx_b)
+            return data + (idx_a, idx_b), target
+
+        def get_data_from_indices(self, idx_a, idx_b):
+            combined = np.concatenate((idx_a, idx_b))
+            unique_ids = np.unique(combined)
+            return self.entire_dataset[unique_ids]
+
+        def reindex_ids(self, idx_a, idx_b):
+            combined = np.concatenate((idx_a, idx_b))
+            unique_elements = np.unique(combined)
+
+            # Create a mapping from unique elements to the range [0, length)
+            mapping = {element: idx for idx, element in enumerate(unique_elements)}
+
+            # Apply the mapping to both arrays
+            mapped_a = np.array([mapping[element] for element in idx_a])
+            mapped_b = np.array([mapping[element] for element in idx_b])
+
+            return mapped_a, mapped_b
+
+    def sample_preference_pairs2(graphs):
+        c = [(a, b, check_util2(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
+        return np.array(c)
+
+    def check_util2(data, index_a, index_b):
+        a = data[index_a]
+        b = data[index_b]
+        util_a = a.y
+        util_b = b.y
+        if util_a >= util_b:
+            return 1
+        else:
+            return 0
+
+    def iterate_train_randomB(elements):
+        objects = elements
+        utilities = np.array([e.y.item() for e in elements])  # Convert tensor values to a numpy array
+        sort_idx = np.argsort(utilities, axis=0)
+        olen = len(objects)
+        seed = SEED + olen
+        pair_count = (olen * (olen - 1)) // 2
+        sampling_ratio = 1
+        sample_size = min(int(sampling_ratio * pair_count), pair_count)
+        rng = np.random.default_rng(seed)
+
+        sample = rng.choice(pair_count, sample_size, replace=False)
+        sample_b = (np.sqrt(sample * 2 + 1 / 4) + 1 / 2).astype(int)  # Convert to integer type
+        sample_a = (sample - (sample_b * (sample_b - 1)) // 2).astype(int)  # Convert to integer type
+        idx_a = sort_idx[sample_a]
+        idx_b = sort_idx[sample_b]
+
+        return idx_a, idx_b
+
+    def get_targetB(data, indices_a, indices_b):
+        assert len(indices_a) == len(indices_b)
+        util_a = np.array([data[idx].y.item() for idx in indices_a])
+        util_b = np.array([data[idx].y.item() for idx in indices_b])
+        target = (util_a > util_b).astype(int)
+        return target
+
+    # dataset = TUDataset(root='/tmp/aspirin', name='aspirin', use_node_attr=True)
+    dataset = PygGraphPropPredDataset(name='ogbg-molesol') #seems to be broken
 
     # Split the dataset into training, validation, and test sets
     train_size = int(VALID_SPLIT * len(dataset))
@@ -44,6 +121,19 @@ if __name__ == '__main__':
     test_size = len(dataset) - train_size - valid_size
     # Split the dataset
     train_dataset, valid_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size, test_size])
+
+    print(len(train_dataset))
+    # t_pairs_and_targets = sample_preference_pairs2(train_dataset)
+    # print(t_pairs_and_targets)
+    # print(len(t_pairs_and_targets))
+    idx_a, idx_b = iterate_train_randomB(train_dataset)
+    print(f"idx_a:{idx_a}")
+    print(f"idx_b:{idx_b}")
+    print(f"len idx_a:{len(idx_a)}")
+    target = get_targetB(train_dataset, idx_a, idx_b)
+    print(f"target:{target}")
+    print("--- %s seconds ---" % (time.time() - start_time))
+    exit(1)
 
     # Create data loaders
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
@@ -58,6 +148,7 @@ if __name__ == '__main__':
             self.conv2 = GCNConv(64, 64)
             self.fc = torch.nn.Linear(64, 1)  # Output 1 for regression
 
+
         def forward(self, data):
             x, edge_index, batch = data.x, data.edge_index, data.batch
             x = self.conv1(x, edge_index)
@@ -65,8 +156,13 @@ if __name__ == '__main__':
             x = self.conv2(x, edge_index)
             x = torch.nn.functional.relu(x)
             x = global_mean_pool(x, batch)  # Aggregate node features to graph level
-            x = self.fc(x)
-            return x
+            x_util = self.fc(x)
+            return x_util
+
+        def pref_lookup(self, x_util, idx_a, idx_b):
+            pref_a = torch.gather(x_util, 0, idx_a)
+            pref_b = torch.gather(x_util, 0, idx_b)
+            return pref_a, pref_b
 
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -97,7 +193,7 @@ if __name__ == '__main__':
         return error / len(loader)
 
 
-    for epoch in range(5):
+    for epoch in range(2):
         train()
         train_error = evaluate(train_loader)
         valid_error = evaluate(valid_loader)
@@ -250,7 +346,7 @@ if __name__ == '__main__':
     # # logger.info(f"Done. Test loss: {loss} - Test Accuracy: {acc}")
 
 
-    # logger.info("--- %s seconds ---" % (time.time() - start_time))
+    print("--- %s seconds ---" % (time.time() - start_time))
     ###############################################################################
     # df = pd.DataFrame({'loss': hs.history['loss'], 'binary_accuracy': hs.history['binary_accuracy']})
     # df.to_csv(config['folder_path'] + '/loss_acc.csv', index=False)
