@@ -3,11 +3,12 @@ import numpy as np
 import torch
 from torch_geometric.datasets import TUDataset
 from ogb.graphproppred import PygGraphPropPredDataset
-# from torch_geometric.loader import DataLoader
+from torch_geometric.loader import DataLoader
+from torch_geometric.data import Data, Batch
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, global_mean_pool
 from itertools import combinations
-from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 if __name__ == '__main__':
     start_time = time.time()
@@ -19,7 +20,7 @@ if __name__ == '__main__':
     print(f"Starting at {start_time}")
     # logger.info(f"Experiment saved in {config['folder_path']}")
     SEED = 42
-    BATCH_SIZE = 64
+    BATCH_SIZE = 256
     EPOCHS = 5
     LEARNING_RATE = 1e-3
     VALID_SPLIT = 0.8
@@ -30,14 +31,7 @@ if __name__ == '__main__':
 
     # shutil.copy('src/models/prgnn.py', config['folder_path']+'/model.py')
     ######################################################################
-
-    # Load data and split it in train and test sets
-    # train_graphs, test_graphs, base_ranking = get_data(config)
-    # print(f"len train_graphs:{len(train_graphs)}")
-    #
-    #
-    # pairs_and_targets_train = sample_preference_pairs2(train_graphs)
-    class CustomDataLoader(DataLoader):
+    class CustomDataLoader(torch.utils.data.DataLoader):
         def __init__(self, pairs_and_targets, dataset, batch_size=1, shuffle=False, **kwargs):
             super().__init__(pairs_and_targets, batch_size=batch_size, shuffle=shuffle, **kwargs)
             self.entire_dataset = dataset
@@ -52,31 +46,40 @@ if __name__ == '__main__':
             idx_a, idx_b, target = zip(*[(x[0], x[1], x[2]) for x in batch])
             data = self.get_data_from_indices(idx_a, idx_b)
             idx_a, idx_b = self.reindex_ids(idx_a, idx_b)
-            return data + (idx_a, idx_b), target
+
+            # Create a DataBatch object
+            data_batch = Batch.from_data_list(data)
+
+            # Add idx_a and idx_b to the DataBatch object
+            data_batch.idx_a = torch.tensor(idx_a)
+            data_batch.idx_b = torch.tensor(idx_b)
+
+            return data_batch, torch.tensor(target)
 
         def get_data_from_indices(self, idx_a, idx_b):
-            combined = np.concatenate((idx_a, idx_b))
-            unique_ids = np.unique(combined)
-            return self.entire_dataset[unique_ids]
+            ids = np.unique(np.concatenate((idx_a, idx_b)))
+            required_data = [self.entire_dataset[int(i)] for i in ids]
+            return required_data
 
         def reindex_ids(self, idx_a, idx_b):
-            combined = np.concatenate((idx_a, idx_b))
-            unique_elements = np.unique(combined)
+            ids = np.unique(np.concatenate((idx_a, idx_b)))
+            idx_a = np.array(idx_a)
+            idx_b = np.array(idx_b)
 
             # Create a mapping from unique elements to the range [0, length)
-            mapping = {element: idx for idx, element in enumerate(unique_elements)}
+            mapping = {element: idx for idx, element in enumerate(ids)}
 
             # Apply the mapping to both arrays
             mapped_a = np.array([mapping[element] for element in idx_a])
             mapped_b = np.array([mapping[element] for element in idx_b])
 
             return mapped_a, mapped_b
-
-    def sample_preference_pairs2(graphs):
-        c = [(a, b, check_util2(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
+    #
+    def sample_preference_pairs(graphs):
+        c = [(a, b, check_util(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
         return np.array(c)
 
-    def check_util2(data, index_a, index_b):
+    def check_util(data, index_a, index_b):
         a = data[index_a]
         b = data[index_b]
         util_a = a.y
@@ -86,7 +89,7 @@ if __name__ == '__main__':
         else:
             return 0
 
-    def iterate_train_randomB(elements):
+    def iterate_train_random(elements):
         objects = elements
         utilities = np.array([e.y.item() for e in elements])  # Convert tensor values to a numpy array
         sort_idx = np.argsort(utilities, axis=0)
@@ -105,7 +108,7 @@ if __name__ == '__main__':
 
         return idx_a, idx_b
 
-    def get_targetB(data, indices_a, indices_b):
+    def get_target(data, indices_a, indices_b):
         assert len(indices_a) == len(indices_b)
         util_a = np.array([data[idx].y.item() for idx in indices_a])
         util_b = np.array([data[idx].y.item() for idx in indices_b])
@@ -113,7 +116,7 @@ if __name__ == '__main__':
         return target
 
     # dataset = TUDataset(root='/tmp/aspirin', name='aspirin', use_node_attr=True)
-    dataset = PygGraphPropPredDataset(name='ogbg-molesol') #seems to be broken
+    dataset = PygGraphPropPredDataset(name='ogbg-molesol') #ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo
 
     # Split the dataset into training, validation, and test sets
     train_size = int(VALID_SPLIT * len(dataset))
@@ -122,23 +125,25 @@ if __name__ == '__main__':
     # Split the dataset
     train_dataset, valid_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size, test_size])
 
-    print(len(train_dataset))
-    # t_pairs_and_targets = sample_preference_pairs2(train_dataset)
-    # print(t_pairs_and_targets)
-    # print(len(t_pairs_and_targets))
-    idx_a, idx_b = iterate_train_randomB(train_dataset)
-    print(f"idx_a:{idx_a}")
-    print(f"idx_b:{idx_b}")
-    print(f"len idx_a:{len(idx_a)}")
-    target = get_targetB(train_dataset, idx_a, idx_b)
-    print(f"target:{target}")
-    print("--- %s seconds ---" % (time.time() - start_time))
-    exit(1)
+    # create pairs and targets
+    # t_pairs_and_targets = sample_preference_pairs(train_dataset)
+    train_idx_a, train_idx_b = iterate_train_random(train_dataset)
+    # target = get_target(train_dataset, idx_a, idx_b)
+    train_target = np.zeros(len(train_idx_a))#due to argsort in iterate_train_randomB all targets are 0
+    train_prefs = np.array(list(zip(train_idx_a, train_idx_b, train_target)))
+
+    valid_idx_a, valid_idx_b = iterate_train_random(valid_dataset)
+    valid_target = np.zeros(len(valid_idx_a))
+    valid_prefs = np.array(list(zip(valid_idx_a, valid_idx_b, valid_target)))
+
+    test_idx_a, test_idx_b = iterate_train_random(test_dataset)
+    test_target = np.zeros(len(test_idx_a))
+    test_prefs = np.array(list(zip(test_idx_a, test_idx_b, test_target)))
 
     # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=BATCH_SIZE, shuffle=True)#
+    valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=BATCH_SIZE, shuffle=False)#
+    test_loader = CustomDataLoader(test_prefs,test_dataset, batch_size=BATCH_SIZE, shuffle=False)#
 
 
     class GCN(torch.nn.Module):
@@ -148,21 +153,26 @@ if __name__ == '__main__':
             self.conv2 = GCNConv(64, 64)
             self.fc = torch.nn.Linear(64, 1)  # Output 1 for regression
 
+        def pref_lookup(self, util, idx_a, idx_b):
+            idx_a = idx_a.long()
+            print(f"idx_a: {idx_a.shape}")
+            print(f"util: {util.shape}")
+            pref_a = torch.gather(util, 0, idx_a)
+            pref_b = torch.gather(util, 0, idx_b)
+            return pref_a, pref_b
 
         def forward(self, data):
-            x, edge_index, batch = data.x, data.edge_index, data.batch
+            x, edge_index, batch, idx_a, idx_b = data.x, data.edge_index, data.batch, data.idx_a, data.idx_b
+            x = x.type(torch.FloatTensor).to(device)
             x = self.conv1(x, edge_index)
             x = F.relu(x)
             x = self.conv2(x, edge_index)
             x = torch.nn.functional.relu(x)
             x = global_mean_pool(x, batch)  # Aggregate node features to graph level
             x_util = self.fc(x)
-            return x_util
+            x_a, x_b = self.pref_lookup(x_util, idx_a, idx_b)
+            return x_b - x_a
 
-        def pref_lookup(self, x_util, idx_a, idx_b):
-            pref_a = torch.gather(x_util, 0, idx_a)
-            pref_b = torch.gather(x_util, 0, idx_b)
-            return pref_a, pref_b
 
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -173,23 +183,30 @@ if __name__ == '__main__':
 
     def train():
         model.train()
-        for data in train_loader:
+        for data, target in train_loader:
             data = data.to(device)
+            target = target.to(device).float()
+            # print(target)
+            # print(target.shape)
             optimizer.zero_grad()
             out = model(data)
-            loss = criterion(out, data.y.view(-1, 1))  # Ensure target shape matches output shape
+            out = out.float()
+            loss = criterion(out, target.view(-1, 1))  # Ensure target shape matches output shape
             loss.backward()
             optimizer.step()
+        exit(1)
 
 
     def evaluate(loader):
         model.eval()
         error = 0
         with torch.no_grad():
-            for data in loader:
+            for data, target in loader:
                 data = data.to(device)
+                target = target.to(device).float()
                 out = model(data)
-                error += criterion(out, data.y.view(-1, 1)).item()  # Ensure target shape matches output shape
+                out = out.float()
+                error += criterion(out, target.view(-1, 1)).item()  # Ensure target shape matches output shape
         return error / len(loader)
 
 
