@@ -1,4 +1,4 @@
-import time
+from datetime import datetime
 import numpy as np
 import torch
 from torch_geometric.datasets import TUDataset
@@ -9,9 +9,11 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, global_mean_pool
 from itertools import combinations
 from tqdm import tqdm
+from scipy.stats import rankdata
+
 
 if __name__ == '__main__':
-    start_time = time.time()
+    start_time = datetime.now()
     ######################################################################
     # SETUP
     # config = setup_experiment(sys.argv[1])
@@ -53,8 +55,9 @@ if __name__ == '__main__':
             # Add idx_a and idx_b to the DataBatch object
             data_batch.idx_a = torch.tensor(idx_a)
             data_batch.idx_b = torch.tensor(idx_b)
+            data_batch.y = torch.tensor(target)
 
-            return data_batch, torch.tensor(target)
+            return data_batch
 
         def get_data_from_indices(self, idx_a, idx_b):
             ids = np.unique(np.concatenate((idx_a, idx_b)))
@@ -126,24 +129,29 @@ if __name__ == '__main__':
     train_dataset, valid_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size, test_size])
 
     # create pairs and targets
-    # t_pairs_and_targets = sample_preference_pairs(train_dataset)
-    train_idx_a, train_idx_b = iterate_train_random(train_dataset)
-    # target = get_target(train_dataset, idx_a, idx_b)
-    train_target = np.zeros(len(train_idx_a))#due to argsort in iterate_train_randomB all targets are 0
-    train_prefs = np.array(list(zip(train_idx_a, train_idx_b, train_target)))
+    train_prefs = sample_preference_pairs(train_dataset)
+    # train_idx_a, train_idx_b = iterate_train_random(train_dataset)
+    # # target = get_target(train_dataset, idx_a, idx_b)
+    # train_target = np.zeros(len(train_idx_a))#due to argsort in iterate_train_randomB all targets are 0
+    # train_prefs = np.array(list(zip(train_idx_a, train_idx_b, train_target)))
 
-    valid_idx_a, valid_idx_b = iterate_train_random(valid_dataset)
-    valid_target = np.zeros(len(valid_idx_a))
-    valid_prefs = np.array(list(zip(valid_idx_a, valid_idx_b, valid_target)))
+    valid_prefs = sample_preference_pairs(valid_dataset)
+    # valid_idx_a, valid_idx_b = iterate_train_random(valid_dataset)
+    # valid_target = np.zeros(len(valid_idx_a))
+    # valid_prefs = np.array(list(zip(valid_idx_a, valid_idx_b, valid_target)))
 
-    test_idx_a, test_idx_b = iterate_train_random(test_dataset)
-    test_target = np.zeros(len(test_idx_a))
-    test_prefs = np.array(list(zip(test_idx_a, test_idx_b, test_target)))
+    test_prefs = np.array(list(zip(range(len(test_dataset)), range(len(test_dataset)), range(len(test_dataset)))))
+    # test_idx_a, test_idx_b = iterate_train_random(test_dataset)
+    # test_target = np.zeros(len(test_idx_a))
+    # test_prefs = np.array(list(zip(test_idx_a, test_idx_b, test_target)))
+    test_ranking = rankdata([g.y.item() for g in test_dataset], method='dense')
+    print(f'len test_dataset:{len(test_dataset)}')
+    print(f'len test_ranking:{len(test_ranking)}')
 
     # Create data loaders
-    train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=BATCH_SIZE, shuffle=True)#
-    valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=BATCH_SIZE, shuffle=False)#
-    test_loader = CustomDataLoader(test_prefs,test_dataset, batch_size=BATCH_SIZE, shuffle=False)#
+    train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False)
 
 
     class GCN(torch.nn.Module):
@@ -154,24 +162,25 @@ if __name__ == '__main__':
             self.fc = torch.nn.Linear(64, 1)  # Output 1 for regression
 
         def pref_lookup(self, util, idx_a, idx_b):
-            idx_a = idx_a.long()
-            print(f"idx_a: {idx_a.shape}")
-            print(f"util: {util.shape}")
+            util = util.squeeze()
             pref_a = torch.gather(util, 0, idx_a)
             pref_b = torch.gather(util, 0, idx_b)
             return pref_a, pref_b
 
         def forward(self, data):
             x, edge_index, batch, idx_a, idx_b = data.x, data.edge_index, data.batch, data.idx_a, data.idx_b
+            print(f'len idx_a:{len(idx_a)}')
+            print(f'len x:{len(x)}')
             x = x.type(torch.FloatTensor).to(device)
             x = self.conv1(x, edge_index)
             x = F.relu(x)
             x = self.conv2(x, edge_index)
             x = torch.nn.functional.relu(x)
-            x = global_mean_pool(x, batch)  # Aggregate node features to graph level
             x_util = self.fc(x)
+            print(f'len x_util:{len(x_util)}')
             x_a, x_b = self.pref_lookup(x_util, idx_a, idx_b)
-            return x_b - x_a
+            out = x_b - x_a
+            return out, x_util
 
 
 
@@ -183,33 +192,45 @@ if __name__ == '__main__':
 
     def train():
         model.train()
-        for data, target in train_loader:
+        for data in train_loader:
             data = data.to(device)
-            target = target.to(device).float()
-            # print(target)
-            # print(target.shape)
             optimizer.zero_grad()
             out = model(data)
-            out = out.float()
-            loss = criterion(out, target.view(-1, 1))  # Ensure target shape matches output shape
+            out = out[0]
+            loss = criterion(out, data.y.float())
             loss.backward()
             optimizer.step()
-        exit(1)
 
 
     def evaluate(loader):
         model.eval()
         error = 0
         with torch.no_grad():
-            for data, target in loader:
+            for data in loader:
                 data = data.to(device)
-                target = target.to(device).float()
                 out = model(data)
+                out = out[0]
+                # print(f'out:{out}')
                 out = out.float()
-                error += criterion(out, target.view(-1, 1)).item()  # Ensure target shape matches output shape
+                error += criterion(out, data.y.float())  # Ensure target shape matches output shape
         return error / len(loader)
 
+    def predict(loader):
+        model.eval()
+        with torch.no_grad():
+            for data in loader:
+                print(f'len data:{len(data)}')
+                print(f'len data.y:{len(data.y)}')
+                data = data.to(device)
+                out = model(data)
+                utils = out[1].detach().cpu().numpy()
+                print(f'len utils:{len(utils)}')
+                utils_ranked = rankdata(utils, method='dense')
+        return utils_ranked
 
+
+
+    print(f'Starting training loop')
     for epoch in range(2):
         train()
         train_error = evaluate(train_loader)
@@ -218,7 +239,10 @@ if __name__ == '__main__':
 
     test_error = evaluate(test_loader)
     print(f'Test Error: {test_error:.4f}')
-    print("Done!")
+    print(f'Training took {datetime.now() - start_time}')
+    print(f'Starting Prediction of ranking')
+    predicted_ranking = predict(test_loader)
+    out = model
 
 
 
@@ -361,9 +385,6 @@ if __name__ == '__main__':
     # # print(pred_utils.shape)
     # # print("end2")
     # # logger.info(f"Done. Test loss: {loss} - Test Accuracy: {acc}")
-
-
-    print("--- %s seconds ---" % (time.time() - start_time))
     ###############################################################################
     # df = pd.DataFrame({'loss': hs.history['loss'], 'binary_accuracy': hs.history['binary_accuracy']})
     # df.to_csv(config['folder_path'] + '/loss_acc.csv', index=False)
