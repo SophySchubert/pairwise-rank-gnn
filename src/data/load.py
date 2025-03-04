@@ -1,78 +1,49 @@
+from ogb.graphproppred import PygGraphPropPredDataset
+from torch_geometric.datasets import TUDataset
 import numpy as np
-from spektral.datasets import TUDataset, QM9
 
-from data.ogb_helper import ogb_available_datasets, OGBDataset
+from data.misc import sample_preference_pairs, rank_data
 
-from itertools import combinations
+def _ogb_available_datasets():
+    return ['ogbg-molesol', 'ogbg-molfreesolv', 'ogbg-mollipo']
 
-from scipy.stats import rankdata
+def _tud_available_datasets():
+    return ['aspirin', 'ZINC_full']
 
 def _load_data(config):
     '''
     Loads a dataset from [TUDataset, OGB]
     '''
     name = config['dataset']
-    # if name == 'QM9':
-    #     dataset = QM9(amount=10)# 1000 and 100000 ok
-    if name in TUDataset.available_datasets():
-        dataset = TUDataset(name)
-        config['x_shape1'] = 28
-    elif name in ogb_available_datasets():
-        dataset= OGBDataset(name)
-        config['x_shape1'] = 9
+    if name in _ogb_available_datasets():
+        dataset= PygGraphPropPredDataset(name=name)
+        config['num_node_features'] = dataset.num_node_features
+    # elif name in _tud_available_datasets():
+    #     dataset = TUDataset(root='/dataset/'+name, name=name)
+    #     if not hasattr(dataset, 'get_idx_split'):
+    #         VALID_SPLIT = 0.8
+    #         TEST_SPLIT = 0.1
+    #         train_size = int(VALID_SPLIT * len(dataset))
+    #         valid_size = int(TEST_SPLIT * len(dataset))
+    #         test_size = len(dataset) - train_size - valid_size
+    #         # Split the dataset
+    #         train_dataset, valid_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size, test_size])
     else:
         raise ValueError(f'Dataset {name} unknown')
 
-    return dataset, dataset.n_labels
-
-def _split_data(data, train_test_split, seed):
-    '''
-    Split the data into train and test sets
-    '''
-    np.random.seed(seed)
-    idxs = np.random.permutation(len(data))
-    split = int(train_test_split * len(data))
-    idx_train, idx_test = np.split(idxs, [split])
-    train, test = data[idx_train], data[idx_test]
-    return train, test
-
-def _rankData(data):
-    ys = [g.y for g in data]
-
-    return rankdata(ys, method='dense')
-
-def sample_preference_pairs(graphs):
-    c = [(a, b, check_util(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
-    idx_a = []
-    idx_b = []
-    target = []
-    for id_a, id_b, t in c:
-        idx_a.append(id_a)
-        idx_b.append(id_b)
-        target.append(t)
-    return np.array(idx_a), np.array(idx_b), np.array(target).reshape(-1, 1)
-
-def check_util(data, index_a, index_b):
-    a = data[index_a]
-    b = data[index_b]
-    util_a = a.y
-    util_b = b.y
-    if util_a >= util_b:
-        return 1
-    else:
-        return 0
-
+    return dataset, dataset.get_idx_split()
 
 def get_data(config):
-    seed = config['seed']
-    train_test_split = config['train_test_split']
+    dataset, split_idx = _load_data(config)
+    # Split the dataset into training, validation, and test sets
+    train_dataset = dataset[split_idx['train']]
+    valid_dataset = dataset[split_idx['valid']]
+    test_dataset = dataset[split_idx['test']]
 
-    # Load data
-    data, config['n_out'] = _load_data(config)
-    # Split data
-    train_data, test_data = _split_data(data, train_test_split, seed)
-    print("len test_data:", len(test_data))
-
-    ground_truth_ranking = _rankData(test_data)
-
-    return train_data, test_data, ground_truth_ranking
+    # create pairs and targets
+    train_prefs = sample_preference_pairs(train_dataset)
+    valid_prefs = sample_preference_pairs(valid_dataset)
+    _tmp = range(len(test_dataset))
+    test_prefs = np.array(list(zip(_tmp, _tmp, _tmp))) # differs due to only needed for prediction
+    test_ranking = rank_data([g.y.item() for g in test_dataset])
+    return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking

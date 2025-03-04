@@ -5,10 +5,6 @@ from yaml import Loader, load
 from datetime import datetime
 from shutil import copyfile
 
-from models.prgnn import PRGNN
-from models.general_gnn import Net
-from models.direct_ranker import DirectRanker
-
 def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)s - %(message)s"):
     """
     Sets up a global logger accessible via logging.getLogger("root").
@@ -42,34 +38,15 @@ def setup_logger(path="./", lvl=20, fmt="%(asctime)s - %(levelname)s - %(module)
 
     return root_logger
 
-def setup_model(config):
-    model_name = config['model']
-    if model_name == 'general_gnn':
-        return Net(config=config)
-    elif model_name == 'prgnn':
-        return PRGNN(config=config)
-    elif model_name == 'direct_ranker':
-        return DirectRanker(config=config)
-    else:
-        raise ValueError(f"Model {model_name} unknown")
-
-def now():
-    return datetime.now()
-
-def read_config(path: str):
+def _read_config(path: str):
     with open(path, "r") as config:
         return load(config, Loader=Loader)
 
 def setup_experiment(path: str):
-    config = read_config(path)
-    experiment_path = os.path.join(".", config['folder_path'], now().strftime("%Y-%m-%d-%H-%M-%S"))
+    config = _read_config(path)
+    experiment_path = os.path.join(".", config['folder_path'], datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
     os.makedirs(experiment_path)
     config['folder_path'] = experiment_path
-    copyfile(path, experiment_path+"/config.json")
-
+    copyfile(path, experiment_path+"/config.yml")
     return config
-
-def save_history(history, path):
-    with open(path+"/trainHistory", "wb") as f:
-        pickle.dump(history.history, f)
 

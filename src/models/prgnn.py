@@ -2,7 +2,6 @@ import tensorflow as tf
 from tensorflow.keras.layers import Dense
 from spektral.layers import ECCConv
 
-
 class PRGNN(tf.keras.Model):
     def __init__(self, config):
         super().__init__()

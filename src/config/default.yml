@@ -3,11 +3,9 @@ folder_path: experiment
 logger:
   level: 10 # CRITICAL = 50, ERROR = 40, WARNING = 30, INFO = 20, DEBUG = 10, NOTSET = 0
   format: "%(asctime)s - %(levelname)s - %(message)s"
-seed: 1
-epochs: 1
-batch_size: 32
-learning_rate: 0.01
-model: prgnn #JA: prgnn | NEIN: general_gnn, direct_ranker
+seed: 32
+epochs: 2
+batch_size: 256
+learning_rate: 0.001
 dataset: ogbg-molesol #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full | NEIN: QM9, aspirin
-train_test_split: 0.8
 mode: default # default, type-vstack, type-hstack, type-merge-mult, type-merge-add, type-merge-mean
