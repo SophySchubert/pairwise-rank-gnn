@@ -8,8 +8,7 @@ from torch_geometric.data import Data, Batch
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, global_mean_pool
 from itertools import combinations
-from tqdm import tqdm
-from scipy.stats import rankdata
+from scipy.stats import rankdata, kendalltau
 
 
 if __name__ == '__main__':
@@ -19,7 +18,7 @@ if __name__ == '__main__':
     # config = setup_experiment(sys.argv[1])
     # logger = setup_logger(config['folder_path'])
     #
-    print(f"Starting at {start_time}")
+    print(f'Starting at {start_time}')
     # logger.info(f"Experiment saved in {config['folder_path']}")
     SEED = 42
     BATCH_SIZE = 256
@@ -77,7 +76,8 @@ if __name__ == '__main__':
             mapped_b = np.array([mapping[element] for element in idx_b])
 
             return mapped_a, mapped_b
-    #
+
+
     def sample_preference_pairs(graphs):
         c = [(a, b, check_util(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
         return np.array(c)
@@ -145,8 +145,8 @@ if __name__ == '__main__':
     # test_target = np.zeros(len(test_idx_a))
     # test_prefs = np.array(list(zip(test_idx_a, test_idx_b, test_target)))
     test_ranking = rankdata([g.y.item() for g in test_dataset], method='dense')
-    print(f'len test_dataset:{len(test_dataset)}')
-    print(f'len test_ranking:{len(test_ranking)}')
+    data_pred_end_time = datetime.now()
+    print(f'Data prep took {data_pred_end_time - start_time}')
 
     # Create data loaders
     train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=BATCH_SIZE, shuffle=True)
@@ -169,17 +169,17 @@ if __name__ == '__main__':
 
         def forward(self, data):
             x, edge_index, batch, idx_a, idx_b = data.x, data.edge_index, data.batch, data.idx_a, data.idx_b
-            print(f'len idx_a:{len(idx_a)}')
-            print(f'len x:{len(x)}')
             x = x.type(torch.FloatTensor).to(device)
             x = self.conv1(x, edge_index)
             x = F.relu(x)
             x = self.conv2(x, edge_index)
             x = torch.nn.functional.relu(x)
-            x_util = self.fc(x)
-            print(f'len x_util:{len(x_util)}')
+            x = self.fc(x)
+            x_util = global_mean_pool(x, batch)
+
             x_a, x_b = self.pref_lookup(x_util, idx_a, idx_b)
             out = x_b - x_a
+
             return out, x_util
 
 
@@ -210,7 +210,6 @@ if __name__ == '__main__':
                 data = data.to(device)
                 out = model(data)
                 out = out[0]
-                # print(f'out:{out}')
                 out = out.float()
                 error += criterion(out, data.y.float())  # Ensure target shape matches output shape
         return error / len(loader)
@@ -219,172 +218,36 @@ if __name__ == '__main__':
         model.eval()
         with torch.no_grad():
             for data in loader:
-                print(f'len data:{len(data)}')
-                print(f'len data.y:{len(data.y)}')
                 data = data.to(device)
                 out = model(data)
                 utils = out[1].detach().cpu().numpy()
-                print(f'len utils:{len(utils)}')
-                utils_ranked = rankdata(utils, method='dense')
-        return utils_ranked
+        return utils
 
 
 
     print(f'Starting training loop')
-    for epoch in range(2):
+    training_start_time = datetime.now()
+    for epoch in range(5):
         train()
         train_error = evaluate(train_loader)
         valid_error = evaluate(valid_loader)
         print(f'Epoch: {epoch + 1}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}')
 
+    training_end_time = datetime.now()
+    print(f'Data prep took {training_end_time - training_start_time}')
+
     test_error = evaluate(test_loader)
     print(f'Test Error: {test_error:.4f}')
     print(f'Training took {datetime.now() - start_time}')
     print(f'Starting Prediction of ranking')
-    predicted_ranking = predict(test_loader)
-    out = model
+    predicted_utils = predict(test_loader)
+    predicted_ranking = rankdata(predicted_utils, method='dense')
+    tau, p_value = kendalltau(test_ranking, predicted_ranking)
+    print(f'Kendall`s Tau: {tau}, P-value: {p_value}')
 
+    print(f'Data prep took {datetime.now() - start_time}')
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    # data_loader_train = CustomDisjointedLoader(train_graphs, pairs_and_targets_train, config, node_level=False, batch_size=config['batch_size'], epochs=config['epochs'], shuffle=True)
-    #
-    # pairs_and_targets_test = sample_preference_pairs2(test_graphs)
-    # data_loader_test = CustomDisjointedLoader(test_graphs, pairs_and_targets_test, config, node_level=False, batch_size=config['batch_size'], epochs=1, shuffle=True)
-    #
-    # #########
-    # # model #
-    # #########
-    # def pref_lookup(X, pref_a, pref_b):
-    #     X_a = tf.gather(X, pref_a, axis=0)
-    #     X_b = tf.gather(X, pref_b, axis=0)
-    #
-    #     return X_a, X_b
-    #
-    # def combine_model(config):
-    #     from tensorflow.keras.layers import Input, Dense, Subtract, Activation
-    #     from spektral.layers import ECCConv
-    #
-    #     x_in = Input(shape=(None,9))
-    #     a_in = Input(shape=(None,None))
-    #     e_in = Input(shape=(None,3))
-    #     i_in = Input(shape=(None,1))#can be ignored
-    #     idx_a = Input(shape=(None,), dtype=tf.int32)
-    #     idx_b = Input(shape=(None,), dtype=tf.int32)
-    #
-    #     # x_in = tf.cast(x_in, tf.float32)
-    #     # a_in = tf.cast(a_in, tf.float32) #a_in.with_values(tf.cast(a_in.values, tf.float32))
-    #     # e_in = tf.cast(e_in, tf.float32)
-    #
-    #     outs = ECCConv(32, activation='relu')([x_in, a_in, e_in])
-    #     outs = ECCConv(32, activation='relu')([outs, a_in, e_in])
-    #     X_util = Dense(config['n_out'], activation=None)(outs)
-    #
-    #     X_a, X_b = pref_lookup(X_util, idx_a, idx_b)
-    #     out = X_b - X_a
-    #
-    #     # Create the new model with the additional layers
-    #     m_infer = tf.keras.Model(inputs=[x_in, a_in, e_in, i_in, idx_a, idx_b], outputs=X_util, name="InferenceModel")
-    #     m = tf.keras.Model(inputs=[x_in, a_in, e_in, i_in, idx_a, idx_b], outputs=out, name="PairwiseModel")
-    #
-    #     return m, m_infer
-    #
-    #
-    # model, model_infer = combine_model(config) #
-    # # model = setup_model(config)
-    #
-    # model.compile(optimizer=Adam(config['learning_rate']),
-    #               loss=BinaryCrossentropy(from_logits=True),
-    #               metrics=[BinaryAccuracy(threshold=.5)],
-    #               # run_eagerly=True
-    #               )
-    #
-    #
-    # ################################################################################
-    # # Fit model
-    # ################################################################################
-    # # hs = model.fit(loader_tr.load(), epochs=config['epochs'], verbose=1)
-    # hs = model.fit(data_loader_train.load(), epochs=config['epochs'], verbose=1)
-    # ################################################################################
-    # # Evaluate model
-    # ################################################################################
-    # # logger.info("Testing model")
-    # # pred_utils = model_infer.predict(loader_te.load(), steps=loader_te.steps_per_epoch)
-    # #TODO: ranking von scipy einbauen wie in load.py
-    #
-    # # print("end1")
-    # # print(pred_utils.shape)
-    # # print("end2")
-    # # logger.info(f"Done. Test loss: {loss} - Test Accuracy: {acc}")
     ###############################################################################
     # df = pd.DataFrame({'loss': hs.history['loss'], 'binary_accuracy': hs.history['binary_accuracy']})
     # df.to_csv(config['folder_path'] + '/loss_acc.csv', index=False)
