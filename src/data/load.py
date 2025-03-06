@@ -2,7 +2,7 @@ from ogb.graphproppred import PygGraphPropPredDataset
 from torch_geometric.datasets import TUDataset
 import numpy as np
 
-from data.misc import sample_preference_pairs, rank_data, combine_two_graphs
+from data.misc import sample_preference_pairs, rank_data, transform_dataset_to_pair_dataset
 
 def _ogb_available_datasets():
     return ['ogbg-molesol', 'ogbg-molfreesolv', 'ogbg-mollipo']
@@ -40,14 +40,18 @@ def get_data(config):
     valid_dataset = dataset[split_idx['valid']]
     test_dataset = dataset[split_idx['test']]
 
+    train_prefs = sample_preference_pairs(train_dataset)
+    valid_prefs = sample_preference_pairs(valid_dataset)
+    test_ranking = rank_data([g.y.item() for g in test_dataset])
+
     # create pairs and targets
     if config['mode'] == 'default':
-        train_prefs = sample_preference_pairs(train_dataset)
-        valid_prefs = sample_preference_pairs(valid_dataset)
         _tmp = range(len(test_dataset))
         test_prefs = np.array(list(zip(_tmp, _tmp, _tmp))) # differs due to only needed for prediction
-        test_ranking = rank_data([g.y.item() for g in test_dataset])
         return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
     elif config['mode'] == 'fully-connected':
-        #TODO: Gedanken auf Papier ausarbeiten und dann implementieren
-        pass
+        train_dataset = transform_dataset_to_pair_dataset(train_dataset, train_prefs, config)
+        valid_dataset = transform_dataset_to_pair_dataset(valid_dataset, valid_prefs, config)
+        test_prefs = sample_preference_pairs(test_dataset)
+        test_dataset = transform_dataset_to_pair_dataset(test_dataset, test_prefs, config)
+        return train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking

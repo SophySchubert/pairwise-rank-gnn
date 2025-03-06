@@ -8,7 +8,7 @@ epochs: 2
 batch_size: 2
 learning_rate: 0.01
 dataset: ogbg-molesol #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full | NEIN: QM9, aspirin
-mode: default # default, fully-connected
+mode: fully-connected # default, fully-connected
 new_grap_edge_value:
   - 1
   - 1

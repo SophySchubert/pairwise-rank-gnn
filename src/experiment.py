@@ -25,7 +25,8 @@ if __name__ == '__main__':
     if config['mode'] == 'default':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
     elif config['mode'] == 'fully-connected':
-        train_dataset, valid_dataset, test_dataset, test_ranking = get_data(config)
+        train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
+        print(f'test_prefs: {test_prefs}')
     else:
         raise ValueError(f'Unknown mode {config["mode"]}')
     data_prep_end_time = datetime.now()
@@ -40,7 +41,6 @@ if __name__ == '__main__':
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
-
     # Create model, optimizer, and loss function
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if config['mode'] == 'default':
@@ -65,7 +65,14 @@ if __name__ == '__main__':
 
     # test model with ranking prediction
     logger.info(f'Starting Prediction of ranking')
-    predicted_utils = predict(model, test_loader, device)
+    if config['mode'] == 'default':
+        predicted_utils = predict(model, test_loader, device)
+    elif config['mode'] == 'fully-connected':
+        raw_predictions = predict(model, test_loader, device)
+        raw_predictions_and_prefs = None#TODO
+        raise(ValueError(f'Implement methods from notebook')
+        predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs)
+
     predicted_ranking = rank_data(predicted_utils)
     tau, p_value = compare_rankings_with_kendalltau(test_ranking, predicted_ranking)
     logger.info(f'Kendall`s Tau: {tau}, P-value: {p_value}')

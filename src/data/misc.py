@@ -88,10 +88,8 @@ def convert_torch_to_nx(graph):
     return nx_g
 
 def combine_two_graphs(graph_a, graph_b, default_value=[1,1,1]):
-    # TODO: a) Kanten Beschriften, ob "standard" oder "Combiniation"      [~]
+    # TODO: a) Differentiate edge, if "standard" or "combiniation"      [~]
     # a) "solved" by giving edge_attr a default value
-    # TODO: b) Welchen Wert bekommt der Graph                                       [✓]
-    # b) Gleichen Wert zu gewiesen, wie bei standard Variante
     ''''
     Combines two Graphs into one
     Visualisation in Eigenanteil.ipynb
@@ -116,6 +114,21 @@ def combine_two_graphs(graph_a, graph_b, default_value=[1,1,1]):
     graph.num_nodes = graph_a.num_nodes + graph_b.num_nodes
 
     return graph
+
+def transform_dataset_to_pair_dataset(dataset, prefs, config):
+    '''
+    Transforms every pair from prefs into a new combined graph
+    '''
+    new_dataset = []
+    for pref in prefs:
+        g_1, g_2 = dataset[pref[0]], dataset[pref[1]]
+        combined_graph = combine_two_graphs(graph_a=g_1, graph_b=g_2, default_value=config['new_grap_edge_value'])
+        assert(combined_graph.y == pref[2])
+        new_dataset.append(combined_graph)
+    return new_dataset
+
+def retrieve_preference_counts_from_predictions(predictions):
+    pass
 
 
 ####### DEPRECATED #######
