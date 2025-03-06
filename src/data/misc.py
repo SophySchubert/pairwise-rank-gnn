@@ -4,8 +4,7 @@ from scipy.stats import rankdata, kendalltau
 import networkx as nx
 import torch
 from torch_geometric.data.data import Data
-from torch_geometric.utils.convert import from_networkx
-
+from torch_geometric.utils.convert import to_networkx, from_networkx
 
 def sample_preference_pairs(graphs):
     c = [(a, b, check_util(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
@@ -59,19 +58,64 @@ def predict(model, loader, device):
             utils = out[1].detach().cpu().numpy()
     return utils
 
-def combine_two_graphs(graph_a, graph_b):
-    # TODO: a) Kanten Beschriften, ob "standard" oder "Kombiniation"      [__]
+def convert_torch_to_nx(graph):
+    '''
+    Converts a torch_geometric graph to a networkx graph
+    Includes nodes, edges, node features, and edge attributes
+    :param graph: torch_geometric graph object
+    :return: networkx graph object
+    '''
+    nx_g = to_networkx(graph)
+
+    # Get edge attributes
+    edge_attrs = graph.edge_attr
+    # Create a dictionary of edge attributes
+    edge_attr_dict = {}
+    for i, (u, v) in enumerate(nx_g.edges()):
+        edge_attr_dict[(u, v)] = edge_attrs[i].tolist()
+    # Set edge attributes
+    nx.set_edge_attributes(nx_g, edge_attr_dict, 'edge_attr')
+
+    # Get node features
+    node_features = graph.x
+    # Create a dictionary of node features
+    node_attr_dict = {}
+    for i, node in enumerate(nx_g.nodes()):
+        node_attr_dict[node] = node_features[i].tolist()
+    # Set node features
+    nx.set_node_attributes(nx_g, node_attr_dict, 'x')
+
+    return nx_g
+
+def combine_two_graphs(graph_a, graph_b, default_value=[1,1,1]):
+    # TODO: a) Kanten Beschriften, ob "standard" oder "Combiniation"      [~]
+    # a) "solved" by giving edge_attr a default value
     # TODO: b) Welchen Wert bekommt der Graph                                       [✓]
+    # b) Gleichen Wert zu gewiesen, wie bei standard Variante
     ''''
     Combines two Graphs into one
     Visualisation in Eigenanteil.ipynb
     '''
-    temp_graph = nx.full_join(graph_a, graph_b)
+    # Convert graphs to networkx
+    nx_graph_a = convert_torch_to_nx(graph_a)
+    nx_graph_b = convert_torch_to_nx(graph_b)
+    # Combine graphs
+    temp_graph = nx.full_join(nx_graph_a, nx_graph_b, rename=("G", "H"))
+
+    # Ensure all edges have the same attributes
+    default_attrs = {'edge_attr': default_value}
+    for u, v in temp_graph.edges():
+        for attr in default_attrs:
+            if attr not in temp_graph[u][v]:
+                temp_graph[u][v][attr] = default_attrs[attr]
+    # calc y value
     temp_y = 1 if graph_a.y.item() >= graph_b.y.item() else 0
+
     graph = from_networkx(temp_graph)
     graph.y = temp_y
-    return graph
+    graph.num_nodes = graph_a.num_nodes + graph_b.num_nodes
 
+    return graph
 
 
 ####### DEPRECATED #######
@@ -109,5 +153,4 @@ if __name__ == "__main__":
     # # target = get_target(train_dataset, train_idx_a, train_idx_b)
     # train_target = np.zeros(len(train_idx_a))#due to argsort in iterate_train_randomB all targets are 0
     # train_prefs = np.array(list(zip(train_idx_a, train_idx_b, train_target)))
-
     pass

@@ -1,4 +1,5 @@
 import torch
+from torch_geometric.loader import DataLoader
 import numpy as np
 from datetime import datetime
 import sys
@@ -6,7 +7,7 @@ import sys
 from misc import setup_experiment, setup_logger
 from data.load import get_data
 from data.loader import CustomDataLoader
-from models.torch_gnn import GCN
+from models.torch_gnn import RGNN, PRGNN
 from data.misc import compare_rankings_with_kendalltau, rank_data, train, evaluate, predict
 
 if __name__ == '__main__':
@@ -21,20 +22,33 @@ if __name__ == '__main__':
     torch.manual_seed(config['seed'])
     ######################################################################
     # Load + prep data
-    train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
+    if config['mode'] == 'default':
+        train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
+    elif config['mode'] == 'fully-connected':
+        train_dataset, valid_dataset, test_dataset, test_ranking = get_data(config)
+    else:
+        raise ValueError(f'Unknown mode {config["mode"]}')
     data_prep_end_time = datetime.now()
     logger.info(f'Data prep took {data_prep_end_time - start_time}')
 
     # Create data loaders
-    train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True)
-    valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False)
-    test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False)
+    if config['mode'] == 'default':
+        train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True)
+        valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False)
+        test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False)
+    elif config['mode'] == 'fully-connected':
+        train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
+        valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=False)
+        test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
 
     # Create model, optimizer, and loss function
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = GCN(num_node_features=config['num_node_features'], device=device)
+    if config['mode'] == 'default':
+        model = RGNN(num_node_features=config['num_node_features'], device=device)
+    elif config['mode'] == 'fully-connected':
+        model = PRGNN(num_node_features=config['num_node_features'], device=device)
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
     criterion = torch.nn.MSELoss()
 
     # Train and evaluate model
