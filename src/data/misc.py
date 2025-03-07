@@ -33,6 +33,9 @@ def train(model, loader, device, optimizer, criterion):
         optimizer.zero_grad()
         out = model(data)
         out = out[0]
+        #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
+        out[0] = 1000.
+        out = torch.nn.functional.softmax(out, dim=0)
         loss = criterion(out, data.y.float())
         loss.backward()
         optimizer.step()
@@ -45,7 +48,9 @@ def evaluate(model, loader, device, criterion):
             data = data.to(device)
             out = model(data)
             out = out[0]
-            out = out.float()
+            #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
+            out[0] = 1000.
+            out = torch.nn.functional.softmax(out, dim=0)
             error += criterion(out, data.y.float())
     return error / len(loader)
 
@@ -127,8 +132,32 @@ def transform_dataset_to_pair_dataset(dataset, prefs, config):
         new_dataset.append(combined_graph)
     return new_dataset
 
-def retrieve_preference_counts_from_predictions(predictions):
-    pass
+def preprocess_predictions(raw_predictions):
+    # Create a mask for rows where the last element is 0
+    mask = raw_predictions[:, 2] == 0
+    # Switch the first and second indices for rows where the mask is True
+    raw_predictions[mask] = raw_predictions[mask][:, [1, 0, 2]]
+    # Remove the last index
+    cleaned_predictions = raw_predictions[:, :2]
+    return cleaned_predictions
+
+def retrieve_preference_counts_from_predictions(predictions, max_range):
+    # Extract the first column
+    first_index_elements = predictions[:, 0]
+
+    # Define the range of possible numbers (assuming 0 to 3 for this example)
+    possible_numbers = range(max_range)
+
+    # Initialize the dictionary with all possible numbers
+    element_counts = {num: 0 for num in possible_numbers}
+
+    # Count the occurrences of each element in the first index
+    unique_elements, counts = np.unique(first_index_elements, return_counts=True)
+
+    # Update the dictionary with the actual counts
+    element_counts.update(dict(zip(unique_elements, counts)))
+
+    return list(element_counts.values())
 
 
 ####### DEPRECATED #######

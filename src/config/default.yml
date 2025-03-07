@@ -5,10 +5,10 @@ logger:
   format: "%(asctime)s - %(levelname)s - %(message)s"
 seed: 32
 epochs: 2
-batch_size: 2
+batch_size: 10
 learning_rate: 0.01
 dataset: ogbg-molesol #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full | NEIN: QM9, aspirin
-mode: fully-connected # default, fully-connected
+mode: default # default, fully-connected
 new_grap_edge_value:
   - 1
   - 1

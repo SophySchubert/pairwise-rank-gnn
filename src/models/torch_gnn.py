@@ -49,7 +49,7 @@ class PRGNN(torch.nn.Module):
         self.fc = torch.nn.Linear(64, 1)  # Output 1 for regression
 
     def forward(self, data):
-        x, edge_index, batch, idx_a, idx_b = data.x, data.edge_index, data.batch
+        x, edge_index, batch = data.x, data.edge_index, data.batch
         x = x.type(torch.FloatTensor).to(self.device)
         x = self.conv1(x, edge_index)
         x = F.relu(x)
@@ -59,3 +59,7 @@ class PRGNN(torch.nn.Module):
         out = global_mean_pool(x, batch)
 
         return out
+
+
+
+    [-0.00926624,  0.02567865, -0.0192144,   0.0124546,  0.03220394, -0.02332168, -0.01295592, -0.0241476, -0.00173322, -0.0011583 ]

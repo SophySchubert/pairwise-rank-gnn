@@ -8,7 +8,7 @@ from misc import setup_experiment, setup_logger
 from data.load import get_data
 from data.loader import CustomDataLoader
 from models.torch_gnn import RGNN, PRGNN
-from data.misc import compare_rankings_with_kendalltau, rank_data, train, evaluate, predict
+from data.misc import compare_rankings_with_kendalltau, rank_data, train, evaluate, predict, preprocess_predictions, retrieve_preference_counts_from_predictions
 
 if __name__ == '__main__':
     start_time = datetime.now()
@@ -69,8 +69,11 @@ if __name__ == '__main__':
         predicted_utils = predict(model, test_loader, device)
     elif config['mode'] == 'fully-connected':
         raw_predictions = predict(model, test_loader, device)
-        raw_predictions_and_prefs = None#TODO
-        raise(ValueError(f'Implement methods from notebook')
+        #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
+        raw_predictions[0] = 1000.
+        raw_predictions = torch.nn.functional.softmax(raw_predictions, dim=0)
+        raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], raw_predictions))
+        cleaned_predictions =  preprocess_predictions(raw_predictions_and_prefs)
         predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs)
 
     predicted_ranking = rank_data(predicted_utils)
