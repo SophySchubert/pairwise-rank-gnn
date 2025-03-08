@@ -85,4 +85,5 @@ if __name__ == '__main__':
     # logger.info(f'Predicted utils: {predicted_utils}')
 
     logger.info(f'Overall experiment took: {datetime.now() - start_time}')
+    torch.save(model.state_dict(), config['folder_path']+'/model.pt')
 

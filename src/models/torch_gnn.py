@@ -17,6 +17,8 @@ class RGNN(torch.nn.Module):
 
     def pref_lookup(self, util, idx_a, idx_b):
         util = util.squeeze()
+        idx_a = idx_a.to(torch.int64)
+        idx_b = idx_b.to(torch.int64)
         pref_a = torch.gather(util, 0, idx_a)
         pref_b = torch.gather(util, 0, idx_b)
         return pref_a, pref_b
@@ -59,7 +61,3 @@ class PRGNN(torch.nn.Module):
         out = global_mean_pool(x, batch)
 
         return out
-
-
-
-    [-0.00926624,  0.02567865, -0.0192144,   0.0124546,  0.03220394, -0.02332168, -0.01295592, -0.0241476, -0.00173322, -0.0011583 ]
