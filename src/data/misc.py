@@ -33,9 +33,9 @@ def train(model, loader, device, optimizer, criterion):
         optimizer.zero_grad()
         out = model(data)
         out = out[0]
-        #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
-        out[0] = 1000.
-        out = torch.nn.functional.softmax(out, dim=0)
+        # #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
+        # out[0] = 1000.
+        # out = torch.nn.functional.softmax(out, dim=0)
         loss = criterion(out, data.y.float())
         loss.backward()
         optimizer.step()
@@ -48,9 +48,9 @@ def evaluate(model, loader, device, criterion):
             data = data.to(device)
             out = model(data)
             out = out[0]
-            #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
-            out[0] = 1000.
-            out = torch.nn.functional.softmax(out, dim=0)
+            # #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
+            # out[0] = 1000.
+            # out = torch.nn.functional.softmax(out, dim=0)
             error += criterion(out, data.y.float())
     return error / len(loader)
 

@@ -11,8 +11,9 @@ class RGNN(torch.nn.Module):
         super(RGNN, self).__init__()
         self.num_node_features = num_node_features
         self.device = device
-        self.conv1 = GCNConv(self.num_node_features, 64)
-        self.conv2 = GCNConv(64, 64)
+        self.conv1 = GCNConv(self.num_node_features, 128)
+        self.conv2 = GCNConv(128, 64)
+        # self.conv3 = GCNConv(64, 64)
         self.fc = torch.nn.Linear(64, 1)  # Output 1 for regression
 
     def pref_lookup(self, util, idx_a, idx_b):
@@ -24,17 +25,33 @@ class RGNN(torch.nn.Module):
         return pref_a, pref_b
 
     def forward(self, data):
+        # print("network")
         x, edge_index, batch, idx_a, idx_b = data.x, data.edge_index, data.batch, data.idx_a, data.idx_b
+        # print(x)
+        # exit(1)
         x = x.type(torch.FloatTensor).to(self.device)
+        # print(x)
         x = self.conv1(x, edge_index)
+        # print(x)
         x = F.relu(x)
         x = self.conv2(x, edge_index)
-        x = torch.nn.functional.relu(x)
+        # print(x)
+        x = F.relu(x)
+        # print(x)
+        # x = self.conv3(x, edge_index)
+        # x = F.relu(x)
         x = self.fc(x)
+        # print(x)
         x_util = global_mean_pool(x, batch)
 
         x_a, x_b = self.pref_lookup(x_util, idx_a, idx_b)
         out = x_b - x_a
+        # print(out)
+        #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
+        out[0] = 1000.
+        out = torch.nn.functional.softmax(out, dim=0)
+        # print(out)
+        # exit(1)
 
         return out, x_util
 

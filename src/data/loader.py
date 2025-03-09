@@ -27,6 +27,9 @@ class CustomDataLoader(DataLoader):
         data_batch.idx_a = torch.tensor(idx_a)
         data_batch.idx_b = torch.tensor(idx_b)
         data_batch.y = torch.tensor(target)
+        # print("loader augment_batch")
+        # print(data_batch)
+        # print(data_batch[1])
 
         return data_batch
 

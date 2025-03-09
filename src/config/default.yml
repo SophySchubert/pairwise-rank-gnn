@@ -3,10 +3,10 @@ folder_path: experiment
 logger:
   level: 10 # CRITICAL = 50, ERROR = 40, WARNING = 30, INFO = 20, DEBUG = 10, NOTSET = 0
   format: "%(asctime)s - %(levelname)s - %(message)s"
-seed: 32
-epochs: 2
-batch_size: 10
-learning_rate: 0.01
+seed: 42
+epochs: 200
+batch_size: 32
+learning_rate: 0.001
 dataset: ogbg-molesol #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full | NEIN: QM9, aspirin
 mode: default # default, fully-connected
 new_grap_edge_value:
