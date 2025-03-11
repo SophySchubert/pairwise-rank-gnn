@@ -26,13 +26,16 @@ def rank_data(items):
 def compare_rankings_with_kendalltau(ranking_a, ranking_b):
     return kendalltau(ranking_a, ranking_b)
 
-def train(model, loader, device, optimizer, criterion):
+def train(model, loader, device, optimizer, criterion, mode='default'):
     model.train()
     for data in loader:
         data = data.to(device)
         optimizer.zero_grad()
         out = model(data)
-        out = out[0]
+        if mode == 'default':
+            out = out[0]
+        else:
+            out = out.squeeze()
         # #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
         # out[0] = 1000.
         # out = torch.nn.functional.softmax(out, dim=0)
@@ -40,14 +43,17 @@ def train(model, loader, device, optimizer, criterion):
         loss.backward()
         optimizer.step()
 
-def evaluate(model, loader, device, criterion):
+def evaluate(model, loader, device, criterion, mode='default'):
     model.eval()
     error = 0
     with torch.no_grad():
         for data in loader:
             data = data.to(device)
             out = model(data)
-            out = out[0]
+            if mode == 'default':
+                out = out[0]
+            else:
+                out = out.squeeze()
             # #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
             # out[0] = 1000.
             # out = torch.nn.functional.softmax(out, dim=0)
