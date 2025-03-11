@@ -54,13 +54,16 @@ def evaluate(model, loader, device, criterion):
             error += criterion(out, data.y.float())
     return error / len(loader)
 
-def predict(model, loader, device):
+def predict(model, loader, device, mode='default'):
     model.eval()
     with torch.no_grad():
         for data in loader:
             data = data.to(device)
             out = model(data)
-            utils = out[1].detach().cpu().numpy()
+            if mode == 'default':
+                utils = out[0].detach().cpu().numpy()
+            else:
+                utils = out.detach().cpu().numpy()
     return utils
 
 def convert_torch_to_nx(graph):

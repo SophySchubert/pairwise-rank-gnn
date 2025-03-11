@@ -4,6 +4,7 @@ import numpy as np
 from datetime import datetime
 import sys
 from shutil import copyfile
+import pickle
 
 from misc import setup_experiment, setup_logger
 from data.load import get_data
@@ -27,8 +28,13 @@ if __name__ == '__main__':
     if config['mode'] == 'default':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
     elif config['mode'] == 'fully-connected':
-        train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
-        print(f'test_prefs: {test_prefs}')
+        with open('data/prepared_data.pkl', 'rb') as f:
+            train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = pickle.load(f)
+        config['num_node_features'] = train_dataset[0].x.size(1) #should be 9 for ogbg-molesol
+        # train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
+        # with open(config['folder_path']+'/prepared_data.pkl', 'wb') as f:
+        #      pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking), f)
+        # print(f'test_prefs: {test_prefs}')
     else:
         raise ValueError(f'Unknown mode {config["mode"]}')
     data_prep_end_time = datetime.now()
@@ -66,13 +72,13 @@ if __name__ == '__main__':
             if config['mode'] == 'default':
                 predicted_utils = predict(model, test_loader, device)
             elif config['mode'] == 'fully-connected':
-                raw_predictions = predict(model, test_loader, device)
+                raw_predictions = predict(model, test_loader, device, mode='fully-connected')
                 # https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
-                raw_predictions[0] = 1000.
-                raw_predictions = torch.nn.functional.softmax(raw_predictions, dim=0)
+                # raw_predictions[0] = 1000.
+                # raw_predictions = torch.nn.functional.softmax(raw_predictions, dim=0)
                 raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], raw_predictions))
                 cleaned_predictions = preprocess_predictions(raw_predictions_and_prefs)
-                predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs)
+                predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs, max_range=len(test_ranking))
 
             predicted_ranking = rank_data(predicted_utils)
             tau, p_value = compare_rankings_with_kendalltau(test_ranking, predicted_ranking)
@@ -88,8 +94,8 @@ if __name__ == '__main__':
     elif config['mode'] == 'fully-connected':
         raw_predictions = predict(model, test_loader, device)
         #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
-        raw_predictions[0] = 1000.
-        raw_predictions = torch.nn.functional.softmax(raw_predictions, dim=0)
+        # raw_predictions[0] = 1000.
+        # raw_predictions = torch.nn.functional.softmax(raw_predictions, dim=0)
         raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], raw_predictions))
         cleaned_predictions =  preprocess_predictions(raw_predictions_and_prefs)
         predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs)
