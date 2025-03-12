@@ -63,16 +63,16 @@ if __name__ == '__main__':
     logger.info(f'Starting training loop')
     training_start_time = datetime.now()
     for epoch in range(config['epochs']):
-        train(model, train_loader, device, optimizer, criterion)
-        train_error = evaluate(model, train_loader, device, criterion)
-        valid_error = evaluate(model, valid_loader, device, criterion)
+        train(model, train_loader, device, optimizer, criterion, config['mode'])
+        train_error = evaluate(model, train_loader, device, criterion, config['mode'])
+        valid_error = evaluate(model, valid_loader, device, criterion, config['mode'])
         logger.info(f'Epoch: {epoch + 1}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}')
         if epoch % 50 == 0 and epoch != config['epochs']:
             torch.save(model.state_dict(), config['folder_path'] + f'/epoch{epoch}_model.pt')
             if config['mode'] == 'default':
                 predicted_utils = predict(model, test_loader, device)
             elif config['mode'] == 'fully-connected':
-                raw_predictions = predict(model, test_loader, device, mode='fully-connected')
+                raw_predictions = predict(model, test_loader, device, config['mode'])
                 # https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
                 # raw_predictions[0] = 1000.
                 # raw_predictions = torch.nn.functional.softmax(raw_predictions, dim=0)
@@ -92,13 +92,10 @@ if __name__ == '__main__':
     if config['mode'] == 'default':
         predicted_utils = predict(model, test_loader, device)
     elif config['mode'] == 'fully-connected':
-        raw_predictions = predict(model, test_loader, device)
-        #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
-        # raw_predictions[0] = 1000.
-        # raw_predictions = torch.nn.functional.softmax(raw_predictions, dim=0)
+        raw_predictions = predict(model, test_loader, device, config['mode'])
         raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], raw_predictions))
         cleaned_predictions =  preprocess_predictions(raw_predictions_and_prefs)
-        predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs)
+        predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs, max_range=len(test_ranking))
 
     predicted_ranking = rank_data(predicted_utils)
     tau, p_value = compare_rankings_with_kendalltau(test_ranking, predicted_ranking)

@@ -11,7 +11,6 @@ class RGNN(torch.nn.Module):
         super(RGNN, self).__init__()
         self.num_node_features = num_node_features
         self.device = device
-        print(f'model on {device}')
         self.conv1 = GCNConv(self.num_node_features, 32)
         # self.conv2 = GCNConv(128, 64)
         # self.conv3 = GCNConv(64, 64)
