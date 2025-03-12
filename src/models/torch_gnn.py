@@ -45,15 +45,16 @@ class RGNN(torch.nn.Module):
         x_util = global_mean_pool(x, batch)
 
         x_a, x_b = self.pref_lookup(x_util, idx_a, idx_b)
-        out = x_b - x_a
-        # print(out)
+        out = x_b - x_a # muss ich hier x_a >= x_b sagen statt minus?
+        print(out)
+        out = torch.le(x_b, x_a) # ausßerhalb des netzes, da es kein grad_fn=<SubBackward0> hat?
         #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
         # out[0] = 1000.
         # out = torch.nn.functional.softmax(out, dim=0)
-        # print(out)
-        # exit(1)
-        out = torch.nn.functional.softmax(out, dim=0)
-        out = (out > 0.5).float()  # Thresholding to get 0 or 1
+        print(out)
+        exit(1)
+        # out = torch.nn.functional.softmax(out, dim=0)
+        # out = (out > 0.5).float()  # Thresholding to get 0 or 1
         return out, x_util
 
 class PRGNN(torch.nn.Module):
