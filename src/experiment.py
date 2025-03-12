@@ -28,11 +28,11 @@ if __name__ == '__main__':
     if config['mode'] == 'default':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
     elif config['mode'] == 'fully-connected':
-        with open('data/prepared_data.pkl', 'rb') as f:
+        with open('data/prepared_data_molesol111.pkl', 'rb') as f:
             train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = pickle.load(f)
         config['num_node_features'] = train_dataset[0].x.size(1) #should be 9 for ogbg-molesol
         # train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
-        # with open(config['folder_path']+'/prepared_data.pkl', 'wb') as f:
+        # with open(config['folder_path']+'/prepared_data_molesol111.pkl', 'wb') as f:
         #      pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking), f)
         # print(f'test_prefs: {test_prefs}')
     else:

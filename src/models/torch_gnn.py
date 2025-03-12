@@ -49,11 +49,12 @@ class RGNN(torch.nn.Module):
         out = x_b - x_a
         # print(out)
         #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
-        out[0] = 1000.
-        out = torch.nn.functional.softmax(out, dim=0)
+        # out[0] = 1000.
+        # out = torch.nn.functional.softmax(out, dim=0)
         # print(out)
         # exit(1)
-
+        out = torch.nn.functional.softmax(out, dim=0)
+        out = (out > 0.5).float()  # Thresholding to get 0 or 1
         return out, x_util
 
 class PRGNN(torch.nn.Module):
@@ -78,6 +79,10 @@ class PRGNN(torch.nn.Module):
         x = self.fc(x)
         out = global_mean_pool(x, batch)
         # https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
-        out[0] = 1000.
+        # out[0] = 1000.
+        # out = torch.nn.functional.softmax(out, dim=0)
         out = torch.nn.functional.softmax(out, dim=0)
+        print(out)
+        out = (out > 0.5).float()  # Thresholding to get 0 or 1
+        print(out)
         return out
