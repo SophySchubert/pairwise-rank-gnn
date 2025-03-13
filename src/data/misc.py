@@ -117,9 +117,9 @@ def combine_two_graphs(graph_a, graph_b, default_value=[1,1,1]):
     # Ensure all edges have the same attributes
     default_attrs = {'edge_attr': default_value}
     for u, v in temp_graph.edges():
-        for attr in default_attrs:
-            if attr not in temp_graph[u][v]:
-                temp_graph[u][v][attr] = default_attrs[attr]
+        for attr, value in default_attrs.items():
+            temp_graph[u][v].setdefault(attr, value)
+
     # calc y value
     temp_y = 1 if graph_a.y.item() >= graph_b.y.item() else 0
 

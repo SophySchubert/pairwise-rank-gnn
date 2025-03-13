@@ -1,5 +1,6 @@
 import torch
 from torch_geometric.loader import DataLoader
+from torch_geometric.seed import seed_everything
 import numpy as np
 from datetime import datetime
 import sys
@@ -21,8 +22,9 @@ if __name__ == '__main__':
     copyfile('src/models/torch_gnn.py', config['folder_path']+'/torch_gnn.py')
     logger.info(f'Starting at {start_time}')
     # SETUP
-    np.random.seed(config['seed'])
-    torch.manual_seed(config['seed'])
+    # np.random.seed(config['seed'])
+    # torch.manual_seed(config['seed'])
+    seed_everything(config['seed'])
     ######################################################################
     # Load + prep data
     if config['mode'] == 'default':
@@ -56,8 +58,9 @@ if __name__ == '__main__':
     elif config['mode'] == 'fully-connected':
         model = PRGNN(num_node_features=config['num_node_features'], device=device)
     model = model.to(device)
+    model = torch.compile(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
-    criterion = torch.nn.MSELoss()
+    criterion = torch.nn.BCEWithLogitsLoss()
 
     # Train and evaluate model
     logger.info(f'Starting training loop')
