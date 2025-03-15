@@ -43,6 +43,8 @@ def train(model, loader, device, optimizer, criterion, mode='default'):
 def evaluate(model, loader, device, criterion, mode='default'):
     model.eval()
     error = 0
+    correct = 0
+    total = 0
     with torch.no_grad():
         for data in loader:
             data = data.to(device)
@@ -51,10 +53,18 @@ def evaluate(model, loader, device, criterion, mode='default'):
                 out = out[0]
             else:
                 out = out.squeeze()
-            error += criterion(out, data.y.float())
-    return error / len(loader)
+            loss = criterion(out, data.y.float())
+            error += loss.item()
 
-def predict(model, loader, device, mode='default'):
+            #calc accuracy
+            predicted = (out > 0.5).float()
+            correct += (predicted == data.y).sum().item()
+            total += data.y.size(0)
+
+    accuracy = correct / total
+    return error / len(loader), accuracy
+
+def predict(model, loader, device, mode='default', last=False):
     model.eval()
     with torch.no_grad():
         for data in loader:
@@ -64,6 +74,8 @@ def predict(model, loader, device, mode='default'):
                 utils = out[1].detach().cpu().numpy()
             else:
                 utils = out.detach().cpu().numpy()
+    if last:
+        print(f'utils: {utils}')
     return utils
 
 def convert_torch_to_nx(graph):

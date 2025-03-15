@@ -12,8 +12,8 @@ class RankGNN(torch.nn.Module):
         super(RankGNN, self).__init__()
         self.num_node_features = num_node_features
         self.device = device
-        self.conv1 = GCNConv(self.num_node_features, 64)
-        self.conv2 = GCNConv(64, 32)
+        self.conv1 = GCNConv(self.num_node_features, 32)
+        self.conv2 = GCNConv(32, 32)
         self.fc = Linear(32, 1)  # Output 1 for regression
 
     def pref_lookup(self, util, idx_a, idx_b):

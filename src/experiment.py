@@ -11,7 +11,7 @@ import os.path
 from misc import setup_experiment, setup_logger
 from data.load import get_data
 from data.loader import CustomDataLoader
-from models.torch_gnn import RGNN, PRGNN
+from models.torch_gnn import RankGNN, PairRankGNN, PairRankGNN2
 from data.misc import compare_rankings_with_kendalltau, rank_data, train, evaluate, predict, preprocess_predictions, retrieve_preference_counts_from_predictions
 
 if __name__ == '__main__':
@@ -45,8 +45,6 @@ if __name__ == '__main__':
                 train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = pickle.load(f)
             config['num_node_features'] = train_dataset[0].x.size(1)
         else:
-            print(config)
-            exit(1)
             train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
             with open(config['folder_path'] + '/prepared_data_INSERT_NAME.pkl', 'wb') as f:
                 pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking), f)
@@ -60,16 +58,18 @@ if __name__ == '__main__':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False)
-    elif config['mode'] == 'fully-connected':
+    elif config['mode'] == 'fc_weight':
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
     # Create model, optimizer, and loss function
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if config['mode'] == 'default':
-        model = RGNN(num_node_features=config['num_node_features'], device=device)
-    elif config['mode'] == 'fully-connected':
-        model = PRGNN(num_node_features=config['num_node_features'], device=device)
+        model = RankGNN(num_node_features=config['num_node_features'], device=device)
+    elif config['mode'] == 'fc_weight':
+        model = PairRankGNN(num_node_features=config['num_node_features'], device=device)
+    elif config['mode'] == 'fc_extra':
+        model = PairRankGNN2(num_node_features=config['num_node_features'], device=device)
     model = model.to(device)
     # model = torch.compile(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
@@ -80,9 +80,9 @@ if __name__ == '__main__':
     training_start_time = datetime.now()
     for epoch in range(config['epochs']):
         train(model, train_loader, device, optimizer, criterion, config['mode'])
-        train_error = evaluate(model, train_loader, device, criterion, config['mode'])
-        valid_error = evaluate(model, valid_loader, device, criterion, config['mode'])
-        logger.info(f'Epoch: {epoch + 1}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}')
+        train_error, test_acc = evaluate(model, train_loader, device, criterion, config['mode'])
+        valid_error, valid_acc = evaluate(model, valid_loader, device, criterion, config['mode'])
+        logger.info(f'Epoch: {epoch + 1}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}, Train Acc: {test_acc:.4f}, Valid Acc: {valid_acc:.4f}')
         if epoch % 50 == 0 and epoch != config['epochs']:
             torch.save(model.state_dict(), config['folder_path'] + f'/epoch{epoch}_model.pt')
             if config['mode'] == 'default':
@@ -97,15 +97,17 @@ if __name__ == '__main__':
             tau, p_value = compare_rankings_with_kendalltau(test_ranking, predicted_ranking)
             logger.info(f'Kendall`s Tau: {tau}, P-value: {p_value}')
 
+    test_error, test_acc = evaluate(model, test_loader, device, criterion, config['mode'])
+    logger.info(f'Test Error: {test_error:.4f}, Test Acc: {test_acc:.4f}')
     training_end_time = datetime.now()
     logger.info(f'Training took {training_end_time - training_start_time}')
 
     # test model with ranking prediction
     logger.info(f'Starting Prediction of ranking')
     if config['mode'] == 'default':
-        predicted_utils = predict(model, test_loader, device)
+        predicted_utils = predict(model, test_loader, device, last=True)
     elif config['mode'] == 'fully-connected':
-        raw_predictions = predict(model, test_loader, device, config['mode'])
+        raw_predictions = predict(model, test_loader, device, config['mode'], True)
         raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], raw_predictions))
         cleaned_predictions =  preprocess_predictions(raw_predictions_and_prefs)
         predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs, max_range=len(test_ranking))
