@@ -31,27 +31,28 @@ if __name__ == '__main__':
     if config['mode'] == 'default':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
     elif config['mode'] == 'fc_weight':
-        if os.path.isfile('data/prepared_data_molesol111.pkl'):
-            with open('data/prepared_data_molesol111.pkl', 'rb') as f:
+        if os.path.isfile(f"data/{config['data_name']}.pkl"):
+            with open(f"data/{config['data_name']}.pkl", 'rb') as f:
                 train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = pickle.load(f)
             config['num_node_features'] = train_dataset[0].x.size(1)
         else:
             train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
-            with open(config['folder_path']+'/prepared_data_INSERT_NAME.pkl', 'wb') as f:
+            with open(config['folder_path']+f"/{config['data_name']}.pkl", 'wb') as f:
                  pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking), f)
     elif config['mode'] == 'fc_extra':
-        if os.path.isfile('data/prepared_data_molesol_extra.pkl'):
-            with open('data/prepared_data_molesol_extra_INSERT_TYPE.pkl', 'rb') as f:
+        if os.path.isfile(f"data/{config['data_name']}.pkl"):
+            with open(f"data/{config['data_name']}.pkl", 'rb') as f:
                 train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = pickle.load(f)
             config['num_node_features'] = train_dataset[0].x.size(1)
         else:
             train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
-            with open(config['folder_path'] + '/prepared_data_INSERT_NAME.pkl', 'wb') as f:
+            with open(config['folder_path']+f"/{config['data_name']}.pkl", 'wb') as f:
                 pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking), f)
     else:
         raise ValueError(f'Unknown mode {config["mode"]}')
     data_prep_end_time = datetime.now()
     logger.info(f'Data prep took {data_prep_end_time - start_time}')
+    exit(1)
 
     # Create data loaders
     if config['mode'] == 'default':

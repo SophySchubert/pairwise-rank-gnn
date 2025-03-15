@@ -8,10 +8,11 @@ epochs: 100
 batch_size: 1024
 learning_rate: 0.01
 dataset: ogbg-molesol #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full
-mode: default # default, fc_weight, fc_extra
-bidirectional: True
+mode: fc_extra # default, fc_weight, fc_extra
+bidirectional: False
 new_grap_edge_value:
-  - 1
-  - 1
-  - 1
+  - 5
+  - 5
+  - 5
+data_name: prepared_data_molesol_extra_false
 # 1 und 0 umdrehen?
