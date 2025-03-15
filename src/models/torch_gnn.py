@@ -1,19 +1,20 @@
 import torch
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, global_mean_pool
+from torch.nn import Linear
+from torch_geometric.nn import GCNConv, global_mean_pool, EdgeConv
 
-class RGNN(torch.nn.Module):
+class RankGNN(torch.nn.Module):
     ''' Pairwise GraphConvolutionNetwork
         data are graphs
         pairs are referenced by the idx_*
     '''
     def __init__(self, num_node_features=9, device='cpu'):
-        super(RGNN, self).__init__()
+        super(RankGNN, self).__init__()
         self.num_node_features = num_node_features
         self.device = device
         self.conv1 = GCNConv(self.num_node_features, 64)
         self.conv2 = GCNConv(64, 32)
-        self.fc = torch.nn.Linear(32, 1)  # Output 1 for regression
+        self.fc = Linear(32, 1)  # Output 1 for regression
 
     def pref_lookup(self, util, idx_a, idx_b):
         util = util.squeeze()
@@ -39,17 +40,17 @@ class RGNN(torch.nn.Module):
 
         return out, x_util
 
-class PRGNN(torch.nn.Module):
+class PairRankGNN(torch.nn.Module):
     ''' Pairwise GraphConvolution Network
         data represents the fully connected graph pairs (no idx_* needed)
     '''
     def __init__(self, num_node_features=9, device='cpu'):
-        super(PRGNN, self).__init__()
+        super(PairRankGNN, self).__init__()
         self.num_node_features = num_node_features
         self.device = device
         self.conv1 = GCNConv(self.num_node_features, 64)
         self.conv2 = GCNConv(64, 32)
-        self.fc = torch.nn.Linear(32, 1)  # Output 1 for regression
+        self.fc = Linear(32, 1)  # Output 1 for regression
 
     def forward(self, data):
         x, edge_index, batch = data.x, data.edge_index, data.batch
@@ -57,7 +58,37 @@ class PRGNN(torch.nn.Module):
         x = self.conv1(x, edge_index)
         x = F.relu(x)
         x = self.conv2(x, edge_index)
-        x = torch.nn.functional.relu(x)
+        x = F.relu(x)
+        x = self.fc(x)
+        out = global_mean_pool(x, batch)
+        return out
+
+class PairRankGNN2(torch.nn.Module):
+    ''' Pairwise GraphConvolution Network
+        data represents the fully connected graph pairs (no idx_* needed)
+        new edge connections are stored separately
+    '''
+    def __init__(self, num_node_features=9, device='cpu'):
+        super(PairRankGNN2, self).__init__()
+        self.num_node_features = num_node_features
+        self.device = device
+        self.conv1 = GCNConv(self.num_node_features, 64)
+        self.edge1 = EdgeConv(64, 64)
+        self.conv2 = GCNConv(64, 32)
+        self.edge2 = EdgeConv(32, 32)
+        self.fc = Linear(32, 1)  # Output 1 for regression
+
+    def forward(self, data):
+        x, edge_index, adj, batch= data.x, data.edge_index, data.adj, data.batch
+        x = x.type(torch.FloatTensor).to(self.device)
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = self.edge1(x, adj)
+        x = F.relu(x)
+        x = self.conv2(x, edge_index)
+        x = F.relu(x)
+        x = self.edge2(x, adj)
+        x = F.relu(x)
         x = self.fc(x)
         out = global_mean_pool(x, batch)
         return out

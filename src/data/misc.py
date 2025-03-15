@@ -3,7 +3,7 @@ import numpy as np
 from scipy.stats import rankdata, kendalltau
 import networkx as nx
 import torch
-from torch_geometric.data.data import Data
+from torch_geometric.data import Data, Batch
 from torch_geometric.utils.convert import to_networkx, from_networkx
 
 def sample_preference_pairs(graphs):
@@ -36,9 +36,6 @@ def train(model, loader, device, optimizer, criterion, mode='default'):
             out = out[0]
         else:
             out = out.squeeze()
-        # #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
-        # out[0] = 1000.
-        # out = torch.nn.functional.softmax(out, dim=0)
         loss = criterion(out, data.y.float())
         loss.backward()
         optimizer.step()
@@ -54,9 +51,6 @@ def evaluate(model, loader, device, criterion, mode='default'):
                 out = out[0]
             else:
                 out = out.squeeze()
-            # #https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
-            # out[0] = 1000.
-            # out = torch.nn.functional.softmax(out, dim=0)
             error += criterion(out, data.y.float())
     return error / len(loader)
 
@@ -67,7 +61,7 @@ def predict(model, loader, device, mode='default'):
             data = data.to(device)
             out = model(data)
             if mode == 'default':
-                utils = out[0].detach().cpu().numpy()
+                utils = out[1].detach().cpu().numpy()
             else:
                 utils = out.detach().cpu().numpy()
     return utils
@@ -102,10 +96,8 @@ def convert_torch_to_nx(graph):
     return nx_g
 
 def combine_two_graphs(graph_a, graph_b, default_value=[1,1,1]):
-    # TODO: a) Differentiate edge, if "standard" or "combiniation"      [~]
-    # a) "solved" by giving edge_attr a default value
     ''''
-    Combines two Graphs into one
+    Combines two Graphs into one with networx (kinda slow) sets a default value for edge weight
     Visualisation in Eigenanteil.ipynb
     '''
     # Convert graphs to networkx
@@ -129,6 +121,30 @@ def combine_two_graphs(graph_a, graph_b, default_value=[1,1,1]):
 
     return graph
 
+def combine_two_graphs_torch(graph_a, graph_b, bidirectional=False):
+    # combine two graphs
+    data_batch = Batch.from_data_list([graph_a, graph_b])
+    num_nodes_graph_a = graph_a.num_nodes
+    num_nodes_graph_b = graph_b.num_nodes
+    node_features = data_batch.x
+    edge_index = data_batch.edge_index
+    edge_attr = data_batch.edge_attr
+    target = 1 if graph_a.y.item() >= graph_b.y.item() else 0
+    # connect two graphs
+    adj = torch.cartesian_prod(torch.arange(num_nodes_graph_a),
+                               torch.arange(num_nodes_graph_a, num_nodes_graph_a + num_nodes_graph_b))
+    adj = adj.transpose(0, 1)  # have it look like edge_index
+    if bidirectional:
+        adj0 = adj[0]
+        adj1 = adj[1]
+        adj0, adj1 = torch.cat((adj0, adj1)), torch.cat((adj1, adj0))
+        adj = torch.stack((adj0, adj1))
+    # create new graph
+    new_graph = Data(x=node_features, edge_attr=edge_attr, edge_index=edge_index, y=target, adj=adj,
+                     num_nodes=num_nodes_graph_a + num_nodes_graph_b)
+
+    return new_graph
+
 def transform_dataset_to_pair_dataset(dataset, prefs, config):
     '''
     Transforms every pair from prefs into a new combined graph
@@ -137,6 +153,18 @@ def transform_dataset_to_pair_dataset(dataset, prefs, config):
     for pref in prefs:
         g_1, g_2 = dataset[pref[0]], dataset[pref[1]]
         combined_graph = combine_two_graphs(graph_a=g_1, graph_b=g_2, default_value=config['new_grap_edge_value'])
+        assert(combined_graph.y == pref[2])
+        new_dataset.append(combined_graph)
+    return new_dataset
+
+def transform_dataset_to_pair_dataset_torch(dataset, prefs, config):
+    '''
+    Transforms every pair from prefs into a new combined graph
+    '''
+    new_dataset = []
+    for pref in prefs:
+        g_1, g_2 = dataset[pref[0]], dataset[pref[1]]
+        combined_graph = combine_two_graphs_torch(graph_a=g_1, graph_b=g_2, bidirectional=config['bidirectional'])
         assert(combined_graph.y == pref[2])
         new_dataset.append(combined_graph)
     return new_dataset

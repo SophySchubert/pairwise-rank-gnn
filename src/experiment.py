@@ -6,6 +6,7 @@ from datetime import datetime
 import sys
 from shutil import copyfile
 import pickle
+import os.path
 
 from misc import setup_experiment, setup_logger
 from data.load import get_data
@@ -29,14 +30,26 @@ if __name__ == '__main__':
     # Load + prep data
     if config['mode'] == 'default':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
-    elif config['mode'] == 'fully-connected':
-        with open('data/prepared_data_molesol111.pkl', 'rb') as f:
-            train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = pickle.load(f)
-        config['num_node_features'] = train_dataset[0].x.size(1) #should be 9 for ogbg-molesol
-        # train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
-        # with open(config['folder_path']+'/prepared_data_molesol111.pkl', 'wb') as f:
-        #      pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking), f)
-        # print(f'test_prefs: {test_prefs}')
+    elif config['mode'] == 'fc_weight':
+        if os.path.isfile('data/prepared_data_molesol111.pkl'):
+            with open('data/prepared_data_molesol111.pkl', 'rb') as f:
+                train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = pickle.load(f)
+            config['num_node_features'] = train_dataset[0].x.size(1)
+        else:
+            train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
+            with open(config['folder_path']+'/prepared_data_INSERT_NAME.pkl', 'wb') as f:
+                 pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking), f)
+    elif config['mode'] == 'fc_extra':
+        if os.path.isfile('data/prepared_data_molesol_extra.pkl'):
+            with open('data/prepared_data_molesol_extra_INSERT_TYPE.pkl', 'rb') as f:
+                train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = pickle.load(f)
+            config['num_node_features'] = train_dataset[0].x.size(1)
+        else:
+            print(config)
+            exit(1)
+            train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
+            with open(config['folder_path'] + '/prepared_data_INSERT_NAME.pkl', 'wb') as f:
+                pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking), f)
     else:
         raise ValueError(f'Unknown mode {config["mode"]}')
     data_prep_end_time = datetime.now()
@@ -58,7 +71,7 @@ if __name__ == '__main__':
     elif config['mode'] == 'fully-connected':
         model = PRGNN(num_node_features=config['num_node_features'], device=device)
     model = model.to(device)
-    model = torch.compile(model)
+    # model = torch.compile(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
     criterion = torch.nn.BCEWithLogitsLoss()
 
@@ -74,11 +87,8 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), config['folder_path'] + f'/epoch{epoch}_model.pt')
             if config['mode'] == 'default':
                 predicted_utils = predict(model, test_loader, device)
-            elif config['mode'] == 'fully-connected':
+            else:
                 raw_predictions = predict(model, test_loader, device, config['mode'])
-                # https://discuss.pytorch.org/t/softmax-outputing-0-or-1-instead-of-probabilities/101564
-                # raw_predictions[0] = 1000.
-                # raw_predictions = torch.nn.functional.softmax(raw_predictions, dim=0)
                 raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], raw_predictions))
                 cleaned_predictions = preprocess_predictions(raw_predictions_and_prefs)
                 predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs, max_range=len(test_ranking))
