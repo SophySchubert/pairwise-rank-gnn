@@ -52,7 +52,6 @@ if __name__ == '__main__':
         raise ValueError(f'Unknown mode {config["mode"]}')
     data_prep_end_time = datetime.now()
     logger.info(f'Data prep took {data_prep_end_time - start_time}')
-    exit(1)
 
     # Create data loaders
     if config['mode'] == 'default':
@@ -66,11 +65,11 @@ if __name__ == '__main__':
     # Create model, optimizer, and loss function
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if config['mode'] == 'default':
-        model = RankGNN(num_node_features=config['num_node_features'], device=device)
+        model = RankGNN(num_node_features=config['num_node_features'], device=device, config=config)
     elif config['mode'] == 'fc_weight':
-        model = PairRankGNN(num_node_features=config['num_node_features'], device=device)
+        model = PairRankGNN(num_node_features=config['num_node_features'], device=device, config=config)
     elif config['mode'] == 'fc_extra':
-        model = PairRankGNN2(num_node_features=config['num_node_features'], device=device)
+        model = PairRankGNN2(num_node_features=config['num_node_features'], device=device, config=config)
     model = model.to(device)
     # model = torch.compile(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])

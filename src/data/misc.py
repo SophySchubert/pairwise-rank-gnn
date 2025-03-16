@@ -75,7 +75,7 @@ def predict(model, loader, device, mode='default', last=False):
             else:
                 utils = out.detach().cpu().numpy()
     if last:
-        print(f'utils: {utils}')
+        print(f'utils: {utils.reshape(-1)}')
     return utils
 
 def convert_torch_to_nx(graph):
@@ -142,7 +142,7 @@ def combine_two_graphs_torch(graph_a, graph_b, bidirectional=False):
     edge_index = data_batch.edge_index
     edge_attr = data_batch.edge_attr
     target = 1 if graph_a.y.item() >= graph_b.y.item() else 0
-    # connect two graphs
+    # connect two graphss
     adj = torch.cartesian_prod(torch.arange(num_nodes_graph_a),
                                torch.arange(num_nodes_graph_a, num_nodes_graph_a + num_nodes_graph_b))
     adj = adj.transpose(0, 1)  # have it look like edge_index

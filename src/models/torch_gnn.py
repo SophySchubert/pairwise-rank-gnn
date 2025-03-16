@@ -8,12 +8,13 @@ class RankGNN(torch.nn.Module):
         data are graphs
         pairs are referenced by the idx_*
     '''
-    def __init__(self, num_node_features=9, device='cpu'):
+    def __init__(self, num_node_features=9, device='cpu', config=None):
         super(RankGNN, self).__init__()
         self.num_node_features = num_node_features
         self.device = device
-        self.conv1 = GCNConv(self.num_node_features, 32)
-        self.conv2 = GCNConv(32, 32)
+        self.config = config
+        self.conv1 = GCNConv(self.num_node_features, config['model_units'])
+        self.conv2 = GCNConv(config['model_units'], 32)
         self.fc = Linear(32, 1)  # Output 1 for regression
 
     def pref_lookup(self, util, idx_a, idx_b):
@@ -44,12 +45,13 @@ class PairRankGNN(torch.nn.Module):
     ''' Pairwise GraphConvolution Network
         data represents the fully connected graph pairs (no idx_* needed)
     '''
-    def __init__(self, num_node_features=9, device='cpu'):
+    def __init__(self, num_node_features=9, device='cpu', config=None):
         super(PairRankGNN, self).__init__()
         self.num_node_features = num_node_features
         self.device = device
-        self.conv1 = GCNConv(self.num_node_features, 64)
-        self.conv2 = GCNConv(64, 32)
+        self.config = config
+        self.conv1 = GCNConv(self.num_node_features, config['model_units'])
+        self.conv2 = GCNConv(config['model_units'], 32)
         self.fc = Linear(32, 1)  # Output 1 for regression
 
     def forward(self, data):
@@ -68,13 +70,14 @@ class PairRankGNN2(torch.nn.Module):
         data represents the fully connected graph pairs (no idx_* needed)
         new edge connections are stored separately
     '''
-    def __init__(self, num_node_features=9, device='cpu'):
+    def __init__(self, num_node_features=9, device='cpu', config=None):
         super(PairRankGNN2, self).__init__()
         self.num_node_features = num_node_features
         self.device = device
-        self.conv1 = GCNConv(self.num_node_features, 64)
-        self.edge1 = EdgeConv(64, 64)
-        self.conv2 = GCNConv(64, 32)
+        self.config = config
+        self.conv1 = GCNConv(self.num_node_features, config['model_units'])
+        self.edge1 = EdgeConv(config['model_units'], config['model_units'])
+        self.conv2 = GCNConv(config['model_units'], 32)
         self.edge2 = EdgeConv(32, 32)
         self.fc = Linear(32, 1)  # Output 1 for regression
 

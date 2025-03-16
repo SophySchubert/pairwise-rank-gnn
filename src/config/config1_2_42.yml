@@ -6,13 +6,13 @@ logger:
 seed: 42
 epochs: 100
 batch_size: 1024
-learning_rate: 0.01
+learning_rate: 0.001
 model_units: 64
 dataset: ogbg-molesol #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full
-mode: fc_weight # default, fc_weight, fc_extra
+mode: default # default, fc_weight, fc_extra
 bidirectional: False
 new_grap_edge_value:
-  - 0
-  - 0
-  - 0
-data_name: prepared_data_molesol000
+  - 5
+  - 5
+  - 5
+data_name: prepared_data_molesol_INSERT_NAME
