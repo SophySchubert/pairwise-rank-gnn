@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
-from torch.nn import Linear
-from torch_geometric.nn import GCNConv, global_mean_pool, EdgeConv
+from torch.nn import Linear, Dropout
+from torch_geometric.nn import GCNConv, global_mean_pool, EdgeConv, GraphConv
 
 class RankGNN(torch.nn.Module):
     ''' Pairwise GraphConvolutionNetwork
@@ -16,6 +16,7 @@ class RankGNN(torch.nn.Module):
         self.conv1 = GCNConv(self.num_node_features, config['model_units'])
         self.conv2 = GCNConv(config['model_units'], 32)
         self.fc = Linear(32, 1)  # Output 1 for regression
+        self.dropout = Dropout(config['model_dropout'])
 
     def pref_lookup(self, util, idx_a, idx_b):
         util = util.squeeze()
@@ -31,8 +32,10 @@ class RankGNN(torch.nn.Module):
         x = x.type(torch.FloatTensor).to(self.device)
         x = self.conv1(x, edge_index)
         x = F.relu(x)
+        x = self.dropout(x)
         x = self.conv2(x, edge_index)
         x = F.relu(x)
+        x = self.dropout(x)
         x = self.fc(x)
         x_util = global_mean_pool(x, batch)
 

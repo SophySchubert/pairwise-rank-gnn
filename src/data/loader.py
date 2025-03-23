@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
-from torch_geometric.data import Data, Batch
+from torch_geometric.data import Batch
 import numpy as np
 
 

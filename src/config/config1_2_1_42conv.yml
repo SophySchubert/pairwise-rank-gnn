@@ -7,7 +7,7 @@ seed: 42 #42, 43, 44
 epochs: 100
 batch_size: 1024
 learning_rate: 0.01
-model_units: 64
+model_units: 32
 dataset: ogbg-molesol #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full
 mode: default # default, fc_weight, fc_extra
 bidirectional: False

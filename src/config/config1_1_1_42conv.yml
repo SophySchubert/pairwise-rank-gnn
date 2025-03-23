@@ -3,17 +3,16 @@ folder_path: experiment
 logger:
   level: 10 # CRITICAL = 50, ERROR = 40, WARNING = 30, INFO = 20, DEBUG = 10, NOTSET = 0
   format: "%(asctime)s - %(levelname)s - %(message)s"
-seed: 42
+seed: 42 #42, 43, 44
 epochs: 100
-batch_size: 128
-learning_rate: 0.001
-model_units: 64
-model_dropout: 0.3
+batch_size: 1024
+learning_rate: 0.01
+model_units: 128
 dataset: ogbg-molesol #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full
 mode: default # default, fc_weight, fc_extra
 bidirectional: False
 new_grap_edge_value:
-  - 0
-  - 0
-  - 0
-data_name: prepared_data_molesol000
+  - 5
+  - 5
+  - 5
+data_name: prepared_data_molesol_INSERT_NAME
