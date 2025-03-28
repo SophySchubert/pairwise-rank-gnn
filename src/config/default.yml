@@ -4,12 +4,12 @@ logger:
   level: 10 # CRITICAL = 50, ERROR = 40, WARNING = 30, INFO = 20, DEBUG = 10, NOTSET = 0
   format: "%(asctime)s - %(levelname)s - %(message)s"
 seed: 42
-epochs: 100
-batch_size: 128
-learning_rate: 0.001
-model_units: 64
+epochs: 501
+batch_size: 64
+learning_rate: 0.0001
+model_units: 32
 model_dropout: 0.3
-dataset: ogbg-molesol #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full
+dataset: ogbg-molfreesolv #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full
 mode: default # default, fc_weight, fc_extra
 bidirectional: False
 new_grap_edge_value:

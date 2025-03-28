@@ -35,11 +35,12 @@ def _load_data(config):
 
 def get_data(config):
     dataset, split_idx = _load_data(config)
+    print(len(dataset))
     # Split the dataset into training, validation, and test sets
     train_dataset = dataset[split_idx['train']]
     valid_dataset = dataset[split_idx['valid']]
     test_dataset = dataset[split_idx['test']]
-    test_dataset = test_dataset[:15]
+    # test_dataset = test_dataset[:15]
 
     train_prefs = sample_preference_pairs(train_dataset)
     valid_prefs = sample_preference_pairs(valid_dataset)

@@ -7,6 +7,7 @@ import sys
 from shutil import copyfile
 import pickle
 import os.path
+from random import shuffle
 
 from misc import setup_experiment, setup_logger
 from data.load import get_data
@@ -75,16 +76,31 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
     criterion = torch.nn.BCEWithLogitsLoss()
 
+
     # Train and evaluate model
     logger.info(f'Starting training loop')
     training_start_time = datetime.now()
+
+    trainloader_cached = []
+    valid_loader_cached = []
+
+    for data in train_loader:
+        trainloader_cached.append(data)
+    for data in valid_loader:
+        valid_loader_cached.append(data)
+
     for epoch in range(config['epochs']):
-        train(model, train_loader, device, optimizer, criterion, config['mode'])
-        train_error, test_acc = evaluate(model, train_loader, device, criterion, config['mode'])
-        valid_error, valid_acc = evaluate(model, valid_loader, device, criterion, config['mode'])
+        shuffle(trainloader_cached)
+        shuffle(valid_loader_cached)
+        train(model, trainloader_cached, device, optimizer, criterion, config['mode'])
+        train_error, test_acc = evaluate(model, trainloader_cached, device, criterion, config['mode'])
+        valid_error, valid_acc = evaluate(model, valid_loader_cached, device, criterion, config['mode'])
         logger.info(f'Epoch: {epoch + 1}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}, Train Acc: {test_acc:.4f}, Valid Acc: {valid_acc:.4f}')
         if epoch % 50 == 0 and epoch != config['epochs']:
             torch.save(model.state_dict(), config['folder_path'] + f'/epoch{epoch}_model.pt')
+            state = {'epoch': epoch + 1, 'state_dict': model.state_dict(),
+                     'optimizer': optimizer.state_dict(), 'losslogger': criterion, }
+            torch.save(state, config['folder_path'] + f'/epoch{epoch}_state.pt')
             if config['mode'] == 'default':
                 predicted_utils = predict(model, test_loader, device)
             else:

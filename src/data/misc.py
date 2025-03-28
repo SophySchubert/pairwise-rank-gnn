@@ -57,7 +57,7 @@ def evaluate(model, loader, device, criterion, mode='default'):
             error += loss.item()
 
             #calc accuracy
-            predicted = (out > 0.5).float()
+            predicted = (out >= 0.5).float()
             correct += (predicted == data.y).sum().item()
             total += data.y.size(0)
 
@@ -72,9 +72,11 @@ def predict(model, loader, device, mode='default', last=False):
             out = model(data)
             if mode == 'default':
                 utils = out[1].detach().cpu().numpy()
+                prefs = out[0].detach().cpu().numpy()
             else:
                 utils = out.detach().cpu().numpy()
     if last:
+        print(f'prefs: {prefs.reshape(-1)}')
         print(f'utils: {utils.reshape(-1)}')
     return utils
 

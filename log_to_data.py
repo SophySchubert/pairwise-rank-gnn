@@ -27,4 +27,23 @@ for exp in experiments:
             plt.xlabel("Epochs")
             plt.ylabel("Accuracy / Loss")
             plt.savefig('plot.svg')
+            plt.close()
+            # fig, ax1 = plt.subplots()
+            #
+            # ax1.set_xlabel("Epochs")
+            # ax1.set_ylabel("Error")
+            # ax1.plot(df.index, df['Train Error'], label='Train Error', color='tab:blue')
+            # ax1.plot(df.index, df['Valid Error'], label='Valid Error', color='tab:orange')
+            # ax1.tick_params(axis='y')
+            #
+            # ax2 = ax1.twinx()
+            # ax2.set_ylabel("Accuracy")
+            # ax2.plot(df.index, df['Train Acc'], label='Train Acc', color='tab:green')
+            # ax2.plot(df.index, df['Valid Acc'], label='Valid Acc', color='tab:red')
+            # ax2.tick_params(axis='y')
+            #
+            # fig.tight_layout()
+            # fig.legend(loc='upper right', bbox_to_anchor=(1, 1), bbox_transform=ax1.transAxes)
+            # plt.savefig('plot.svg')
+            # plt.close()
     os.chdir("..")
