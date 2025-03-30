@@ -20,6 +20,7 @@ if __name__ == '__main__':
     ######################################################################
     # CONFIG
     config = setup_experiment(sys.argv[1])
+
     logger = setup_logger(config['folder_path'], lvl=config['logger']['level'])
     copyfile('src/models/torch_gnn.py', config['folder_path']+'/torch_gnn.py')
     logger.info(f'Starting at {start_time}')
@@ -65,6 +66,7 @@ if __name__ == '__main__':
         test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
     # Create model, optimizer, and loss function
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(device)
     if config['mode'] == 'default':
         model = RankGNN(num_node_features=config['num_node_features'], device=device, config=config)
     elif config['mode'] == 'fc_weight':
@@ -96,10 +98,10 @@ if __name__ == '__main__':
         train_error, test_acc = evaluate(model, trainloader_cached, device, criterion, config['mode'])
         valid_error, valid_acc = evaluate(model, valid_loader_cached, device, criterion, config['mode'])
         logger.info(f'Epoch: {epoch + 1}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}, Train Acc: {test_acc:.4f}, Valid Acc: {valid_acc:.4f}')
-        if epoch % 50 == 0 and epoch != config['epochs']:
+        if epoch % 50 == 0:
             torch.save(model.state_dict(), config['folder_path'] + f'/epoch{epoch}_model.pt')
             state = {'epoch': epoch + 1, 'state_dict': model.state_dict(),
-                     'optimizer': optimizer.state_dict(), 'losslogger': criterion, }
+                     'optimizer': optimizer.state_dict(), 'losslogger': criterion}
             torch.save(state, config['folder_path'] + f'/epoch{epoch}_state.pt')
             if config['mode'] == 'default':
                 predicted_utils = predict(model, test_loader, device)
