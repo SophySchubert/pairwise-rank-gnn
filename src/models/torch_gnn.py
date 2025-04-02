@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch.nn import Linear, Dropout, Sequential, ReLU
 from torch.nn import BatchNorm1d as BatchNorm
 from torch.nn import Linear, ReLU, Sequential, Tanh, PReLU
-from torch_geometric.nn import GCNConv, AGNNConv, GINConv, global_add_pool, global_mean_pool, EdgeConv, GraphConv, global_add_pool
+from torch_geometric.nn import GCNConv, AGNNConv, GINConv, global_mean_pool, EdgeConv, GraphConv, global_add_pool
 
 class RankGNN(torch.nn.Module):
     ''' Pairwise GraphConvolutionNetwork
@@ -54,7 +54,7 @@ class RankGNN(torch.nn.Module):
         x = self.fc3(x)
         x = self.dropout(x)
 
-        x_util = global_add_pool(x, batch)
+        x_util = global_mean_pool(x, batch)
 
         x_a, x_b = self.pref_lookup(x_util, idx_a, idx_b)
         out = x_b - x_a

@@ -123,12 +123,15 @@ if __name__ == '__main__':
     # test model with ranking prediction
     logger.info(f'Starting Prediction of ranking')
     if config['mode'] == 'default':
-        predicted_utils = predict(model, test_loader, device, last=True)
+        predicted_utils, TODO = predict(model, test_loader, device, last=True)
     elif config['mode'] == 'fully-connected':
         raw_predictions = predict(model, test_loader, device, config['mode'], True)
         raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], raw_predictions))
         cleaned_predictions =  preprocess_predictions(raw_predictions_and_prefs)
         predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs, max_range=len(test_ranking))
+
+    logger.info(f'raw prefs: {predicted_utils.reshape(-1)}')
+    logger.info(f'raw utils: {TODO.reshape(-1)}')
 
     predicted_ranking = rank_data(predicted_utils)
     tau, p_value = compare_rankings_with_kendalltau(test_ranking, predicted_ranking)

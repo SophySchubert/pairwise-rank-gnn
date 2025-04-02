@@ -75,10 +75,8 @@ def predict(model, loader, device, mode='default', last=False):
                 prefs = out[0].detach().cpu().numpy()
             else:
                 utils = out.detach().cpu().numpy()
-    if last:
-        print(f'prefs: {prefs.reshape(-1)}')
-        print(f'utils: {utils.reshape(-1)}')
-    return utils
+                prefs = [0]
+    return utils, prefs
 
 def convert_torch_to_nx(graph):
     '''
