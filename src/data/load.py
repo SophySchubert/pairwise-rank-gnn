@@ -40,26 +40,23 @@ def get_data(config):
     train_dataset = dataset[split_idx['train']]
     valid_dataset = dataset[split_idx['valid']]
     test_dataset = dataset[split_idx['test']]
-    # test_dataset = test_dataset[:15]
 
     train_prefs = sample_preference_pairs(train_dataset)
     valid_prefs = sample_preference_pairs(valid_dataset)
+    test_prefs = sample_preference_pairs(test_dataset)
     test_ranking = rank_data([g.y.item() for g in test_dataset])
 
     # create pairs and targets
     if config['mode'] == 'default':
-        _tmp = range(len(test_dataset))
-        test_prefs = np.array(list(zip(_tmp, _tmp, _tmp))) # differs due to only needed for prediction
+        test_prefs = np.array([[0, i, 0] for i in range(0, len(test_dataset))])# differs due to only needed for prediction
         return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
     elif config['mode'] == 'fc_weight':
         train_dataset = transform_dataset_to_pair_dataset(train_dataset, train_prefs, config)
         valid_dataset = transform_dataset_to_pair_dataset(valid_dataset, valid_prefs, config)
-        test_prefs = sample_preference_pairs(test_dataset)
         test_dataset = transform_dataset_to_pair_dataset(test_dataset, test_prefs, config)
         return train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking
     elif config['mode'] == 'fc_extra':
         train_dataset = transform_dataset_to_pair_dataset_torch(train_dataset, train_prefs, config)
         valid_dataset = transform_dataset_to_pair_dataset_torch(valid_dataset, valid_prefs, config)
-        test_prefs = sample_preference_pairs(test_dataset)
         test_dataset = transform_dataset_to_pair_dataset_torch(test_dataset, test_prefs, config)
         return train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking

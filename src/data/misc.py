@@ -31,12 +31,11 @@ def train(model, loader, device, optimizer, criterion, mode='default'):
     for data in loader:
         data = data.to(device)
         optimizer.zero_grad()
-        out = model(data)
         if mode == 'default':
-            out = out[0]
+            pref, util = model(data)
         else:
-            out = out.squeeze()
-        loss = criterion(out, data.y.float())
+            pref = model(data).squeeze()
+        loss = criterion(pref, data.y.float())
         loss.backward()
         optimizer.step()
 
@@ -48,35 +47,36 @@ def evaluate(model, loader, device, criterion, mode='default'):
     with torch.no_grad():
         for data in loader:
             data = data.to(device)
-            out = model(data)
             if mode == 'default':
-                out = out[0]
+                pref, util = model(data)
             else:
-                out = out.squeeze()
-            loss = criterion(out, data.y.float())
+                pref = model(data).squeeze()
+            loss = criterion(pref, data.y.float())
             error += loss.item()
 
             #calc accuracy
-            predicted = (out >= 0.5).float()
+            predicted = (pref >= 0.5).float()
             correct += (predicted == data.y).sum().item()
             total += data.y.size(0)
 
     accuracy = correct / total
+
     return error / len(loader), accuracy
 
-def predict(model, loader, device, mode='default', last=False):
+def predict(model, loader, device, mode='default'):
     model.eval()
     with torch.no_grad():
         for data in loader:
             data = data.to(device)
-            out = model(data)
             if mode == 'default':
-                utils = out[1].detach().cpu().numpy()
-                prefs = out[0].detach().cpu().numpy()
+                pref, util = model(data)
+                pref = pref.detach().cpu().numpy()
+                util = util.detach().cpu().numpy()
             else:
-                utils = out.detach().cpu().numpy()
-                prefs = [0]
-    return utils, prefs
+                pref = model(data)
+                util = None
+                pref = pref.detach().cpu().numpy()
+    return pref, util
 
 def convert_torch_to_nx(graph):
     '''

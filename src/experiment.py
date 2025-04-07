@@ -60,13 +60,13 @@ if __name__ == '__main__':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False)
-    elif config['mode'] == 'fc_weight':
+    else:
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
+
     # Create model, optimizer, and loss function
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(device)
     if config['mode'] == 'default':
         model = RankGNN(num_node_features=config['num_node_features'], device=device, config=config)
     elif config['mode'] == 'fc_weight':
@@ -74,7 +74,6 @@ if __name__ == '__main__':
     elif config['mode'] == 'fc_extra':
         model = PairRankGNN2(num_node_features=config['num_node_features'], device=device, config=config)
     model = model.to(device)
-    # model = torch.compile(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
     criterion = torch.nn.BCEWithLogitsLoss()
 
@@ -85,11 +84,13 @@ if __name__ == '__main__':
 
     trainloader_cached = []
     valid_loader_cached = []
-
+    test_loader_cached = []
     for data in train_loader:
         trainloader_cached.append(data)
     for data in valid_loader:
         valid_loader_cached.append(data)
+    for data in test_loader:
+        test_loader_cached.append(data)
 
     for epoch in range(config['epochs']):
         shuffle(trainloader_cached)
@@ -98,20 +99,20 @@ if __name__ == '__main__':
         train_error, test_acc = evaluate(model, trainloader_cached, device, criterion, config['mode'])
         valid_error, valid_acc = evaluate(model, valid_loader_cached, device, criterion, config['mode'])
         logger.info(f'Epoch: {epoch + 1}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}, Train Acc: {test_acc:.4f}, Valid Acc: {valid_acc:.4f}')
-        if epoch % 50 == 0:
+        if epoch % 25 == 0:
             torch.save(model.state_dict(), config['folder_path'] + f'/epoch{epoch}_model.pt')
             state = {'epoch': epoch + 1, 'state_dict': model.state_dict(),
                      'optimizer': optimizer.state_dict(), 'losslogger': criterion}
             torch.save(state, config['folder_path'] + f'/epoch{epoch}_state.pt')
             if config['mode'] == 'default':
-                predicted_utils = predict(model, test_loader, device)
+                _, predicted_util = predict(model, test_loader, device)
             else:
-                raw_predictions = predict(model, test_loader, device, config['mode'])
-                raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], raw_predictions))
+                raw_pref, _ = predict(model, test_loader, device, config['mode'])
+                raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], raw_pref))
                 cleaned_predictions = preprocess_predictions(raw_predictions_and_prefs)
-                predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs, max_range=len(test_ranking))
+                predicted_util = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs, max_range=len(test_ranking))
 
-            predicted_ranking = rank_data(predicted_utils)
+            predicted_ranking = rank_data(predicted_util)
             tau, p_value = compare_rankings_with_kendalltau(test_ranking, predicted_ranking)
             logger.info(f'Kendall`s Tau: {tau}, P-value: {p_value}')
 
@@ -123,23 +124,20 @@ if __name__ == '__main__':
     # test model with ranking prediction
     logger.info(f'Starting Prediction of ranking')
     if config['mode'] == 'default':
-        predicted_utils, TODO = predict(model, test_loader, device, last=True)
-    elif config['mode'] == 'fully-connected':
-        raw_predictions = predict(model, test_loader, device, config['mode'], True)
-        raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], raw_predictions))
-        cleaned_predictions =  preprocess_predictions(raw_predictions_and_prefs)
-        predicted_utils = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs, max_range=len(test_ranking))
+        predicted_pref, predicted_util = predict(model, test_loader, device)
+    else:
+        predicted_pref, _ = predict(model, test_loader, device, config['mode'])
+        raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], predicted_pref))
+        cleaned_predictions = preprocess_predictions(raw_predictions_and_prefs)
+        predicted_util = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs,
+                                                                     max_range=len(test_ranking))
 
-    logger.info(f'raw prefs: {predicted_utils.reshape(-1)}')
-    logger.info(f'raw utils: {TODO.reshape(-1)}')
+    logger.info(f'raw prefs: {predicted_util.reshape(-1)}')
+    logger.info(f'raw utils: {predicted_pref.reshape(-1)}')
 
-    predicted_ranking = rank_data(predicted_utils)
+    predicted_ranking = rank_data(predicted_util)
     tau, p_value = compare_rankings_with_kendalltau(test_ranking, predicted_ranking)
     logger.info(f'Kendall`s Tau: {tau}, P-value: {p_value}')
-    # logger.info(f'test ranking: {test_ranking}')
-    # logger.info(f'test utils: {[g.y.item() for g in test_dataset]}')
-    # logger.info(f'Predicted ranking: {predicted_ranking}')
-    # logger.info(f'Predicted utils: {predicted_utils}')
 
     logger.info(f'Overall experiment took: {datetime.now() - start_time}')
     torch.save(model.state_dict(), config['folder_path']+'/model.pt')
