@@ -5,9 +5,10 @@ import numpy as np
 
 
 class CustomDataLoader(DataLoader):
-    def __init__(self, pairs_and_targets, dataset, batch_size=1, shuffle=False, **kwargs):
+    def __init__(self, pairs_and_targets, dataset, batch_size=1, shuffle=False, attention=False, **kwargs):
         super().__init__(pairs_and_targets, batch_size=batch_size, shuffle=shuffle, **kwargs)
         self.entire_dataset = dataset
+        self.attention = attention
 
     def __iter__(self):
         for batch in super().__iter__():
@@ -17,15 +18,26 @@ class CustomDataLoader(DataLoader):
     def augment_batch(self, batch):
         # batch is a list of pairs and targets
         idx_a, idx_b, target = zip(*[(x[0], x[1], x[2]) for x in batch])
-        data = self.get_data_from_indices(idx_a, idx_b)
-        idx_a, idx_b = self.reindex_ids(idx_a, idx_b)
+        if not self.attention:
+            data = self.get_data_from_indices(idx_a, idx_b)
+            idx_a, idx_b = self.reindex_ids(idx_a, idx_b)
+        else:
+            data_a = self.get_data_from_indices(idx_a, [])
+            data_b = self.get_data_from_indices(idx_b, [])
 
         # Create a DataBatch object
-        data_batch = Batch.from_data_list(data)
+        if not self.attention:
+            data_batch = Batch.from_data_list(data)
+            # Add idx_a and idx_b to the DataBatch object
+            data_batch.idx_a = torch.tensor(idx_a)
+            data_batch.idx_b = torch.tensor(idx_b)
+        else:
+            # Combine the two lists of data into a single list
+            data_batch = Batch
+            data_batch.a = Batch.from_data_list(data_a)
+            data_batch.b = Batch.from_data_list(data_b)
 
-        # Add idx_a and idx_b to the DataBatch object
-        data_batch.idx_a = torch.tensor(idx_a)
-        data_batch.idx_b = torch.tensor(idx_b)
+
         data_batch.y = torch.tensor(target)
 
         return data_batch
