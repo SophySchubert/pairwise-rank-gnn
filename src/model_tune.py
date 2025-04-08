@@ -1,14 +1,5 @@
-import torch
-from torch_geometric.loader import DataLoader
-from torch_geometric.seed import seed_everything
-import numpy as np
-from datetime import datetime
-import sys
-from shutil import copyfile
 import pickle
 import os.path
-import os
-import tempfile
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
 from functools import partial
@@ -22,13 +13,11 @@ from ray.tune.schedulers import ASHAScheduler
 import torch
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout
-from torch_geometric.nn import GCNConv, global_mean_pool, EdgeConv, GraphConv
+from torch_geometric.nn import GCNConv, global_mean_pool
 import torch.nn as nn
 
-from misc import setup_experiment, setup_logger, _read_config
 from data.load import get_data
 from data.loader import CustomDataLoader
-from models.torch_gnn import RankGNN
 
 
 class Net(nn.Module):

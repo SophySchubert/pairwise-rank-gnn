@@ -29,13 +29,20 @@ def compare_rankings_with_kendalltau(ranking_a, ranking_b):
 def train(model, loader, device, optimizer, criterion, mode='default'):
     model.train()
     for data in loader:
-        data = data.to(device)
+        if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight':
+            data = data.to(device)
+            y = data.y
+        else:
+            tmp_0 = data[0].to(device)
+            tmp_1 = data[1].to(device)
+            data = [tmp_0, tmp_1]
+            y = data[0].y
         optimizer.zero_grad()
         if mode == 'default':
             pref, util = model(data)
         else:
             pref = model(data).squeeze()
-        loss = criterion(pref, data.y.float())
+        loss = criterion(pref, y.float())
         loss.backward()
         optimizer.step()
 
@@ -46,18 +53,26 @@ def evaluate(model, loader, device, criterion, mode='default'):
     total = 0
     with torch.no_grad():
         for data in loader:
-            data = data.to(device)
+            if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight':
+                data = data.to(device)
+                y = data.y
+            else:
+                tmp_0 = data[0].to(device)
+                tmp_1 = data[1].to(device)
+                data = [tmp_0, tmp_1]
+                y = data[0].y
+
             if mode == 'default':
                 pref, util = model(data)
             else:
                 pref = model(data).squeeze()
-            loss = criterion(pref, data.y.float())
+            loss = criterion(pref, y.float())
             error += loss.item()
 
             #calc accuracy
             predicted = (pref >= 0.5).float()
-            correct += (predicted == data.y).sum().item()
-            total += data.y.size(0)
+            correct += (predicted == y).sum().item()
+            total += y.size(0)
 
     accuracy = correct / total
 
@@ -67,13 +82,20 @@ def predict(model, loader, device, mode='default'):
     model.eval()
     with torch.no_grad():
         for data in loader:
-            data = data.to(device)
+            if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight':
+                data = data.to(device)
+            else:
+                tmp_0 = data[0].to(device)
+                tmp_1 = data[1].to(device)
+                data = [tmp_0, tmp_1]
             if mode == 'default':
                 pref, util = model(data)
+                pref = (pref >= 0.5).float()
                 pref = pref.detach().cpu().numpy()
                 util = util.detach().cpu().numpy()
             else:
                 pref = model(data)
+                pref = (pref >= 0.5).float()
                 util = None
                 pref = pref.detach().cpu().numpy()
     return pref, util

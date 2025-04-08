@@ -1,5 +1,5 @@
+import torch
 from ogb.graphproppred import PygGraphPropPredDataset
-from torch_geometric.datasets import TUDataset
 import numpy as np
 
 from data.misc import sample_preference_pairs, rank_data, transform_dataset_to_pair_dataset, transform_dataset_to_pair_dataset_torch
@@ -35,11 +35,16 @@ def _load_data(config):
 
 def get_data(config):
     dataset, split_idx = _load_data(config)
-    print(len(dataset))
     # Split the dataset into training, validation, and test sets
-    train_dataset = dataset[split_idx['train']]
-    valid_dataset = dataset[split_idx['valid']]
-    test_dataset = dataset[split_idx['test']]
+    VALID_SPLIT = 0.8
+    TEST_SPLIT = 0.1
+    train_size = int(VALID_SPLIT * len(dataset))
+    valid_size = int(TEST_SPLIT * len(dataset))
+    test_size = len(dataset) - train_size - valid_size
+    train_dataset, valid_dataset, test_dataset = torch.utils.data.random_split(dataset,[train_size, valid_size, test_size])
+    # train_dataset = dataset[split_idx['train']]
+    # valid_dataset = dataset[split_idx['test']]
+    # test_dataset = dataset[split_idx['valid']]
 
     train_prefs = sample_preference_pairs(train_dataset)
     valid_prefs = sample_preference_pairs(valid_dataset)
@@ -49,6 +54,8 @@ def get_data(config):
     # create pairs and targets
     if config['mode'] == 'default':
         test_prefs = np.array([[0, i, 0] for i in range(0, len(test_dataset))])# differs due to only needed for prediction
+        return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
+    elif config['mode'] == 'attention':
         return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
     elif config['mode'] == 'fc_weight':
         train_dataset = transform_dataset_to_pair_dataset(train_dataset, train_prefs, config)

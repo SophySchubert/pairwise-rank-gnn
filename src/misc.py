@@ -1,6 +1,5 @@
 import os
 import logging
-import pickle
 from yaml import Loader, load
 from datetime import datetime
 from shutil import copyfile
