@@ -8,7 +8,7 @@ epochs: 501
 batch_size: 512
 learning_rate: 0.001
 model_units: 32
-model_layers: 4
+model_layers: 3
 model_dropout: 0.5
 dataset: ogbg-molfreesolv #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC_full
 mode: default # default, fc_weight, fc_extra, attention
