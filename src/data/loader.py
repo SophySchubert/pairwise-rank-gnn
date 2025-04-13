@@ -3,12 +3,14 @@ from torch.utils.data import DataLoader
 from torch_geometric.data import Batch
 import numpy as np
 
+from data.misc import pair_attention_transform
 
 class CustomDataLoader(DataLoader):
-    def __init__(self, pairs_and_targets, dataset, batch_size=1, shuffle=False, attention=False, **kwargs):
+    def __init__(self, pairs_and_targets, dataset, batch_size=1, shuffle=False, mode='default', config=None, **kwargs):
         super().__init__(pairs_and_targets, batch_size=batch_size, shuffle=shuffle, **kwargs)
         self.entire_dataset = dataset
-        self.attention = attention
+        self.mode = mode
+        self.config = config
 
     def __iter__(self):
         for batch in super().__iter__():
@@ -18,7 +20,7 @@ class CustomDataLoader(DataLoader):
     def augment_batch(self, batch):
         # batch is a list of pairs and targets
         idx_a, idx_b, target = zip(*[(x[0], x[1], x[2]) for x in batch])
-        if not self.attention:
+        if self.mode == 'default':
             data = self.get_data_from_indices(idx_a, idx_b)
             idx_a, idx_b = self.reindex_ids(idx_a, idx_b)
 
@@ -29,7 +31,7 @@ class CustomDataLoader(DataLoader):
             data_batch.idx_a = torch.tensor(idx_a)
             data_batch.idx_b = torch.tensor(idx_b)
             data_batch.y = torch.tensor(target)
-        else:
+        elif self.mode == 'gat_attention':
             data_a = self.get_data_from_indices(idx_a, [], attention=True)
             data_b = self.get_data_from_indices(idx_b, [], attention=True)
 
@@ -37,6 +39,15 @@ class CustomDataLoader(DataLoader):
             data_b = Batch.from_data_list(data_b)
             data_a.y = torch.tensor(target)
             data_batch = [data_a, data_b]
+        elif self.mode == 'nagsl_attention':
+            data_a = self.get_data_from_indices(idx_a, [], attention=True)
+            data_b = self.get_data_from_indices(idx_b, [], attention=True)
+
+            data_a = Batch.from_data_list(data_a)
+            data_b = Batch.from_data_list(data_b)
+            data_batch = pair_attention_transform((data_a, data_b), torch.tensor(target), self.config)
+        else:
+            raise ValueError(f"Unknown mode {self.mode}")
 
         return data_batch
 

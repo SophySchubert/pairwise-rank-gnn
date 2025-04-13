@@ -131,6 +131,7 @@ class RankGAN(torch.nn.Module):
 
 
         out = x_b_util - x_a_util
+        out = F.sigmoid(out)
 
         return out
 
@@ -157,6 +158,7 @@ class PairRankGNN(torch.nn.Module):
         x = F.relu(x)
         x = self.fc(x)
         out = global_mean_pool(x, batch)
+        out = F.sigmoid(out)
         return out
 
 class PairRankGNN2(torch.nn.Module):
@@ -189,4 +191,5 @@ class PairRankGNN2(torch.nn.Module):
         x = F.relu(x)
         x = self.fc(x)
         out = global_mean_pool(x, batch)
+        out = F.sigmoid(out)
         return out

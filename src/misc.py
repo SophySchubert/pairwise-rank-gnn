@@ -49,3 +49,32 @@ def setup_experiment(path: str):
     copyfile(path, experiment_path+"/config.yml")
     return config
 
+def config_add_nagsl(config):
+    # Add NAGSL specific configurations from the original code
+    config['channel_ffn_size'] = 128
+    config['n_channel_transformer_heads'] = 4 #most datasets, IMDBMulti was 8
+    config['msa_bias'] = True
+    config['dropout'] = 0.1
+    config['n_heads'] = 8
+    config['encoder_ffn_size'] = 128
+    config['embedding_size'] = 32 # 128 for AIDS dataset
+    config['interaction_mask'] = False
+    config['encoder_mask'] = False
+    config['align_mask'] = False
+    config['cnn_mask'] = False
+    config['encoder_ffn_size'] = 128
+    config['GNN'] = 'GCN'
+    config['GT_res'] = True
+    config['share_qk'] = True
+    config['use_dist'] = False #changed by me because my graph datasets have no dist for nodes
+    config['dist_decay'] = 0
+    config['dist_start_decay'] = 0.5
+    config['conv_channels_0'] = 32
+    config['conv_channels_1'] = 64
+    config['conv_channels_2'] = 1
+    config['conv_channels_3'] = 256
+    config['conv_l_relu_slope'] = 0.33
+    config['conv_dropout'] = 0.1
+    config['channel_align'] = True
+    config['sim_mat_learning_ablation'] = False # set to True to use SimMatPooling
+    return config
