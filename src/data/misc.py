@@ -5,6 +5,7 @@ import networkx as nx
 import torch
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils.convert import to_networkx, from_networkx
+from torch_geometric.utils import to_dense_batch, to_dense_adj
 
 def sample_preference_pairs(graphs):
     c = [(a, b, check_util(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
@@ -32,7 +33,10 @@ def train(model, loader, device, optimizer, criterion, mode='default'):
         if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight':
             data = data.to(device)
             y = data.y
-        else:
+        elif mode == 'nagsl_attention':
+            data = data #already on device
+            y = data['target']
+        else:#gat_attention
             tmp_0 = data[0].to(device)
             tmp_1 = data[1].to(device)
             data = [tmp_0, tmp_1]
@@ -56,7 +60,10 @@ def evaluate(model, loader, device, criterion, mode='default'):
             if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight':
                 data = data.to(device)
                 y = data.y
-            else:
+            elif mode == 'nagsl_attention':
+                data = data #already on device
+                y = data['target']
+            else:#gat_attention
                 tmp_0 = data[0].to(device)
                 tmp_1 = data[1].to(device)
                 data = [tmp_0, tmp_1]
@@ -84,16 +91,19 @@ def predict(model, loader, device, mode='default'):
         for data in loader:
             if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight':
                 data = data.to(device)
-            else:
+            elif mode == 'nagsl_attention':
+                data = data  # already on device
+            else:#gat_attention
                 tmp_0 = data[0].to(device)
                 tmp_1 = data[1].to(device)
                 data = [tmp_0, tmp_1]
+
             if mode == 'default':
                 pref, util = model(data)
                 pref = (pref >= 0.5).float()
                 pref = pref.detach().cpu().numpy()
                 util = util.detach().cpu().numpy()
-            else:
+            else:#gat_attention, nagsl_attention, fc_extra, fc_weight
                 pref = model(data)
                 pref = (pref >= 0.5).float()
                 util = None
@@ -229,6 +239,34 @@ def retrieve_preference_counts_from_predictions(predictions, max_range):
     element_counts.update(dict(zip(unique_elements, counts)))
 
     return list(element_counts.values())
+
+def pair_attention_transform(data, target, config):
+        new_data = dict()
+
+        b0 = to_dense_batch(data[0].x, batch=data[0].batch, max_num_nodes=config['max_num_nodes'])
+        g0 = {
+            'adj': to_dense_adj(
+                data[0].edge_index, batch=data[0].batch, max_num_nodes=config['max_num_nodes']
+            ).to(config['device']),
+            'x': b0[0].to(config['device']),
+            'mask': b0[1].to(config['device']),
+            'dist': None
+        }
+
+        b1 = to_dense_batch(data[1].x, batch=data[1].batch, max_num_nodes=config['max_num_nodes'])
+        g1 = {
+            'adj': to_dense_adj(
+                data[1].edge_index, batch=data[1].batch, max_num_nodes=config['max_num_nodes']
+            ).to(config['device']),
+            'x': b1[0].to(config['device']),
+            'mask': b1[1].to(config['device']),
+            'dist': None
+        }
+
+        new_data['g0'] = g0
+        new_data['g1'] = g1
+        new_data['target'] = target.to(config['device'])
+        return new_data
 
 
 ####### DEPRECATED #######

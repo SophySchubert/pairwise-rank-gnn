@@ -9,10 +9,11 @@ import pickle
 import os.path
 from random import shuffle
 
-from misc import setup_experiment, setup_logger
+from misc import setup_experiment, setup_logger, config_add_nagsl
 from data.load import get_data
 from data.loader import CustomDataLoader
 from models.torch_gnn import RankGNN, RankGAN, PairRankGNN, PairRankGNN2
+from models.NAGSL import NAGSLNet
 from data.misc import compare_rankings_with_kendalltau, rank_data, train, evaluate, predict, preprocess_predictions, retrieve_preference_counts_from_predictions
 
 if __name__ == '__main__':
@@ -20,6 +21,8 @@ if __name__ == '__main__':
     ######################################################################
     # CONFIG
     config = setup_experiment(sys.argv[1])
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    config['device'] = device
 
     logger = setup_logger(config['folder_path'], lvl=config['logger']['level'])
     copyfile('src/models/torch_gnn.py', config['folder_path']+'/torch_gnn.py')
@@ -30,7 +33,9 @@ if __name__ == '__main__':
     seed_everything(config['seed'])
     ######################################################################
     # Load + prep data
-    if config['mode'] == 'default' or config['mode'] == 'attention':
+    if config['mode'] == 'nagsl_attention':
+        config = config_add_nagsl(config)
+    if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
     elif config['mode'] == 'fc_weight':
         if os.path.isfile(f"data/{config['data_name']}.pkl"):
@@ -56,29 +61,30 @@ if __name__ == '__main__':
     logger.info(f'Data prep took {data_prep_end_time - start_time}')
 
     # Create data loaders
-    if config['mode'] == 'default':
-        train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, attention=False)
-        valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False)
-        test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False)
-    elif config['mode'] == 'attention':
-        train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, attention=True)
-        valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, attention=True)
-        test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_prefs), shuffle=False, attention=True)
-    else:
+    if config['mode'] == 'default' or config['mode'] == 'nagsl_attention':
+        train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
+        valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
+        test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
+    elif config['mode'] == 'gat_attention':
+        train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
+        valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
+        test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_prefs), shuffle=False, mode=config['mode'], config=config)
+    else:# fc_weight or fc_extra
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
 
     # Create model, optimizer, and loss function
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if config['mode'] == 'default':
         model = RankGNN(num_node_features=config['num_node_features'], device=device, config=config)
-    elif config['mode'] == 'attention':
+    elif config['mode'] == 'gat_attention':
         model = RankGAN(num_node_features=config['num_node_features'], device=device, config=config)
     elif config['mode'] == 'fc_weight':
         model = PairRankGNN(num_node_features=config['num_node_features'], device=device, config=config)
     elif config['mode'] == 'fc_extra':
         model = PairRankGNN2(num_node_features=config['num_node_features'], device=device, config=config)
+    elif config['mode'] == 'nagsl_attention':
+        model = NAGSLNet(config)
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
     criterion = torch.nn.BCELoss()

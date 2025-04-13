@@ -1,5 +1,6 @@
 import torch
 from ogb.graphproppred import PygGraphPropPredDataset
+from torch_geometric.datasets import ZINC
 import numpy as np
 
 from data.misc import sample_preference_pairs, rank_data, transform_dataset_to_pair_dataset, transform_dataset_to_pair_dataset_torch
@@ -7,27 +8,19 @@ from data.misc import sample_preference_pairs, rank_data, transform_dataset_to_p
 def _ogb_available_datasets():
     return ['ogbg-molesol', 'ogbg-molfreesolv', 'ogbg-mollipo']
 
-def _tud_available_datasets():
-    return ['aspirin', 'ZINC_full']
-
 def _load_data(config):
     '''
-    Loads a dataset from [TUDataset, OGB]
+    Loads a dataset from [pyg, OGBG]
     '''
     name = config['dataset']
     if name in _ogb_available_datasets():
-        dataset= PygGraphPropPredDataset(name=name)
+        dataset = PygGraphPropPredDataset(name=name)
         config['num_node_features'] = dataset.num_node_features
-    # elif name in _tud_available_datasets():
-    #     dataset = TUDataset(root='/dataset/'+name, name=name)
-    #     if not hasattr(dataset, 'get_idx_split'):
-    #         VALID_SPLIT = 0.8
-    #         TEST_SPLIT = 0.1
-    #         train_size = int(VALID_SPLIT * len(dataset))
-    #         valid_size = int(TEST_SPLIT * len(dataset))
-    #         test_size = len(dataset) - train_size - valid_size
-    #         # Split the dataset
-    #         train_dataset, valid_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, valid_size, test_size])
+        config['max_num_nodes'] = max([d.num_nodes for d in dataset])
+    elif name == 'ZINC':
+        dataset = ZINC(root='./data/ZINC', subset=True)
+        config['num_node_features'] = dataset.num_node_features
+        config['max_num_nodes'] = max([d.num_nodes for d in dataset])
     else:
         raise ValueError(f'Dataset {name} unknown')
 
@@ -55,7 +48,7 @@ def get_data(config):
     if config['mode'] == 'default':
         test_prefs = np.array([[0, i, 0] for i in range(0, len(test_dataset))])# differs due to only needed for prediction
         return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
-    elif config['mode'] == 'attention':
+    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
         return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
     elif config['mode'] == 'fc_weight':
         train_dataset = transform_dataset_to_pair_dataset(train_dataset, train_prefs, config)
@@ -67,3 +60,5 @@ def get_data(config):
         valid_dataset = transform_dataset_to_pair_dataset_torch(valid_dataset, valid_prefs, config)
         test_dataset = transform_dataset_to_pair_dataset_torch(test_dataset, test_prefs, config)
         return train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking
+    else:
+        raise ValueError(f'Unknown mode {config["mode"]}')
