@@ -57,11 +57,11 @@ def config_add_nagsl(config):
     config['dropout'] = 0.1
     config['n_heads'] = 8
     config['encoder_ffn_size'] = 128
-    config['embedding_size'] = 32 # 128 for AIDS dataset
+    config['embedding_size'] = 128 # 32 for IMDB, 128 for AIDS dataset
     config['interaction_mask'] = False
     config['encoder_mask'] = False
     config['align_mask'] = False
-    config['cnn_mask'] = False
+    config['cnn_mask'] = True
     config['encoder_ffn_size'] = 128
     config['GNN'] = 'GCN'
     config['GT_res'] = True
@@ -71,7 +71,7 @@ def config_add_nagsl(config):
     config['dist_start_decay'] = 0.5
     config['conv_channels_0'] = 32
     config['conv_channels_1'] = 64
-    config['conv_channels_2'] = 1
+    config['conv_channels_2'] = 128
     config['conv_channels_3'] = 256
     config['conv_l_relu_slope'] = 0.33
     config['conv_dropout'] = 0.1

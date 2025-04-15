@@ -12,8 +12,8 @@ from random import shuffle
 from misc import setup_experiment, setup_logger, config_add_nagsl
 from data.load import get_data
 from data.loader import CustomDataLoader
-from models.torch_gnn import RankGNN, RankGAN, PairRankGNN, PairRankGNN2
-from models.NAGSL import NAGSLNet
+from models.torch_gnn import RankGNN, RankGAN, PairRankGNN, PairRankGNN2, RANet
+from models.NAGSL.NAGSL import NAGSLNet
 from data.misc import compare_rankings_with_kendalltau, rank_data, train, evaluate, predict, preprocess_predictions, retrieve_preference_counts_from_predictions
 
 if __name__ == '__main__':
@@ -37,39 +37,31 @@ if __name__ == '__main__':
         config = config_add_nagsl(config)
     if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
-    elif config['mode'] == 'fc_weight':
+    elif config['mode'] == 'fc_weight' or config['mode'] == 'fc_extra' or config['mode'] == 'my_attention':
         if os.path.isfile(f"data/{config['data_name']}.pkl"):
             with open(f"data/{config['data_name']}.pkl", 'rb') as f:
-                train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = pickle.load(f)
-            config['num_node_features'] = train_dataset[0].x.size(1)
+                train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking, config['num_node_features'], config['max_num_nodes'] = pickle.load(f)
         else:
             train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
             with open(config['folder_path']+f"/{config['data_name']}.pkl", 'wb') as f:
-                 pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking), f)
-    elif config['mode'] == 'fc_extra':
-        if os.path.isfile(f"data/{config['data_name']}.pkl"):
-            with open(f"data/{config['data_name']}.pkl", 'rb') as f:
-                train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = pickle.load(f)
-            config['num_node_features'] = train_dataset[0].x.size(1)
-        else:
-            train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
-            with open(config['folder_path']+f"/{config['data_name']}.pkl", 'wb') as f:
-                pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking), f)
+                 pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking, config['num_node_features'], config['max_num_nodes']), f)
     else:
         raise ValueError(f'Unknown mode {config["mode"]}')
+    logger.info(f'Config: {config}')
+
     data_prep_end_time = datetime.now()
     logger.info(f'Data prep took {data_prep_end_time - start_time}')
 
     # Create data loaders
-    if config['mode'] == 'default' or config['mode'] == 'nagsl_attention':
+    if config['mode'] == 'default':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
-    elif config['mode'] == 'gat_attention':
+    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_prefs), shuffle=False, mode=config['mode'], config=config)
-    else:# fc_weight or fc_extra
+    else:# fc_weight, fc_extra or my_attention
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
@@ -85,6 +77,8 @@ if __name__ == '__main__':
         model = PairRankGNN2(num_node_features=config['num_node_features'], device=device, config=config)
     elif config['mode'] == 'nagsl_attention':
         model = NAGSLNet(config)
+    elif config['mode'] == 'my_attention':
+        model = RANet(config=config)#TODO write its own model
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
     criterion = torch.nn.BCELoss()

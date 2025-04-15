@@ -11,10 +11,10 @@ model_units: 32
 model_layers: 3
 model_dropout: 0.5
 dataset: ogbg-molfreesolv #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC
-mode: nagsl_attention # default, fc_weight, fc_extra, gat_attention, nagsl_attention
-bidirectional: False
+mode: my_attention # default, fc_weight, fc_extra, gat_attention, nagsl_attention, my_attention
+bidirectional: True
 new_grap_edge_value:
   - 0
   - 0
   - 0
-data_name: prepared_data_molesol000
+data_name: attention_edge_weight

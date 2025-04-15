@@ -1,8 +1,8 @@
 import torch
 
-from models.ChannelAlignmentModule import ChannelAlignment
-from models.SimCNNModule import SimCNN
-from models.SimMatPooling import SimMatPooling
+from models.NAGSL.ChannelAlignmentModule import ChannelAlignment
+from models.NAGSL.SimCNNModule import SimCNN
+from models.NAGSL.SimMatPooling import SimMatPooling
 
 
 class SimMatLearning(torch.nn.Module):

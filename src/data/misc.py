@@ -30,7 +30,7 @@ def compare_rankings_with_kendalltau(ranking_a, ranking_b):
 def train(model, loader, device, optimizer, criterion, mode='default'):
     model.train()
     for data in loader:
-        if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight':
+        if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight' or mode == 'my_attention':
             data = data.to(device)
             y = data.y
         elif mode == 'nagsl_attention':
@@ -45,7 +45,8 @@ def train(model, loader, device, optimizer, criterion, mode='default'):
         if mode == 'default':
             pref, util = model(data)
         else:
-            pref = model(data).squeeze()
+            pref = model(data)
+            pref = pref.squeeze()
         loss = criterion(pref, y.float())
         loss.backward()
         optimizer.step()
@@ -57,7 +58,7 @@ def evaluate(model, loader, device, criterion, mode='default'):
     total = 0
     with torch.no_grad():
         for data in loader:
-            if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight':
+            if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight' or mode == 'my_attention':
                 data = data.to(device)
                 y = data.y
             elif mode == 'nagsl_attention':
@@ -89,7 +90,7 @@ def predict(model, loader, device, mode='default'):
     model.eval()
     with torch.no_grad():
         for data in loader:
-            if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight':
+            if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight' or mode == 'my_attention':
                 data = data.to(device)
             elif mode == 'nagsl_attention':
                 data = data  # already on device

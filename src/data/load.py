@@ -50,7 +50,7 @@ def get_data(config):
         return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
     elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
         return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
-    elif config['mode'] == 'fc_weight':
+    elif config['mode'] == 'fc_weight' or config['mode'] == 'my_attention':
         train_dataset = transform_dataset_to_pair_dataset(train_dataset, train_prefs, config)
         valid_dataset = transform_dataset_to_pair_dataset(valid_dataset, valid_prefs, config)
         test_dataset = transform_dataset_to_pair_dataset(test_dataset, test_prefs, config)

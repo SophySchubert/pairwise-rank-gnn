@@ -1,8 +1,8 @@
 import torch
 
-from models.EmbeddingLearning import GCNTransformerEncoder
-from models.EmbeddingInteraction import CrossTransformer
-from models.SimMatLearning import SimMatLearning
+from models.NAGSL.EmbeddingLearning import GCNTransformerEncoder
+from models.NAGSL.EmbeddingInteraction import CrossTransformer
+from models.NAGSL.SimMatLearning import SimMatLearning
 
 
 class NAGSLNet(torch.nn.Module):

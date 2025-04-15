@@ -1,7 +1,10 @@
 import torch
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout
+from torch.nn.attention.flex_attention import flex_attention, create_block_mask
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, EdgeConv
+
+from src.models.misc import create_document_mask
 
 class RankGNN(torch.nn.Module):
     ''' Pairwise GraphConvolutionNetwork
@@ -12,7 +15,6 @@ class RankGNN(torch.nn.Module):
         super().__init__()
         self.num_node_features = num_node_features
         self.device = device
-        print(self.device)
         self.config = config
         self.convIn = GCNConv(self.num_node_features, config['model_units'])
         self.conv2 = GCNConv(config['model_units'], config['model_units'])
@@ -192,4 +194,45 @@ class PairRankGNN2(torch.nn.Module):
         x = self.fc(x)
         out = global_mean_pool(x, batch)
         out = F.sigmoid(out)
+        return out
+
+class RANet(torch.nn.Module):
+    ''' Rank Attention Network
+    '''
+    def __init__(self, config=None):
+        super(RANet, self).__init__()
+        self.device = config['device']
+        self.config = config
+        self.convIn = GCNConv(config['num_node_features'], config['model_units'])
+        self.conv2 = GCNConv(config['model_units'], config['model_units'])
+        self.convOut = GCNConv(config['model_units'], config['model_units'])
+        self.fc1 = Linear(config['model_units'], config['model_units'])
+        self.fc2 = Linear(config['model_units'], 32)
+        self.fc3 = Linear(32, 1)  # Output 1 for regression
+        self.dropout = Dropout(config['model_dropout'])
+
+    def forward(self, data):
+        # Compute block mask at beginning of forwards due to changing every batch
+        ranking_mask = create_document_mask(self.config['batch_size'], data.pair_indices, self.config['max_num_nodes'])
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        x = x.type(torch.FloatTensor).to(self.device)
+        x = self.convIn(x, edge_index)
+        x = F.tanh(x)
+        for i in range(self.config['model_layers'] - 2):
+            x = self.conv2(x, edge_index)
+            x = F.tanh(x)
+            x = self.dropout(x)
+        x = self.convOut(x, edge_index)
+        x = F.tanh(x)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = F.tanh(x)
+        x = self.fc2(x)
+        x = F.tanh(x)
+        x = self.fc3(x)
+        x = self.dropout(x)
+
+        out = global_mean_pool(x, batch)
+        out = F.sigmoid(out)
+
         return out
