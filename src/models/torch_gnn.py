@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch.nn import Linear, Dropout
-from torch.nn.attention.flex_attention import flex_attention, create_block_mask
+from torch.nn.attention.flex_attention import flex_attention, create_block_mask, _mask_mod_signature, noop_mask
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, EdgeConv
 
 from src.models.misc import create_document_mask
@@ -213,10 +213,11 @@ class RANet(torch.nn.Module):
 
     def forward(self, data):
         # Compute block mask at beginning of forwards due to changing every batch
-        ranking_mask = create_document_mask(self.config['batch_size'], data.pair_indices, self.config['max_num_nodes'])
-        x, edge_index, batch = data.x, data.edge_index, data.batch
+        x, edge_index, batch, attention_data, document_id = data.x, data.edge_index, data.batch, data.attention_data, data.document_id
+        ranking_mask = self.generate_doc_mask_mod(document_id)
         x = x.type(torch.FloatTensor).to(self.device)
         x = self.convIn(x, edge_index)
+        a = flex_attention(query=attention_data, key=attention_data, value=attention_data, block_mask=ranking_mask)
         x = F.tanh(x)
         for i in range(self.config['model_layers'] - 2):
             x = self.conv2(x, edge_index)
@@ -236,3 +237,30 @@ class RANet(torch.nn.Module):
         out = F.sigmoid(out)
 
         return out
+
+    def generate_doc_mask_mod(self, document_id: torch.Tensor) -> _mask_mod_signature:
+        """Generates mask mods that apply to inputs to flex attention in the sequence stacked
+        format.
+
+        Args:
+            docment_id: A tensor that contains a unique id for each graph and has the length of the number of nodes in the graph-batch. Each id has the
+                        length of the number of nodes in the graph.
+
+        Note:
+            What is the sequence stacked format? When assembling batches of inputs, we
+            take multiple sequences and stack them together to form 1 large sequence. We then
+            use masking to ensure that the attention scores are only applied to tokens within
+            the different graphs but of the same pair.
+        """
+        unique = torch.unique(document_id)
+
+        def doc_mask_mod(b, h, q_idx, kv_idx):
+            dif_doc = (document_id[q_idx] != document_id[kv_idx])
+            operation = False
+            for i in range(0, len(unique), 2):
+                operation = operation | (((document_id[q_idx] == unique[i]) & (document_id[kv_idx] == unique[i + 1])) | (
+                            (document_id[q_idx] == unique[i + 1]) & (document_id[kv_idx] == unique[i])))
+
+            return dif_doc & operation
+
+        return doc_mask_mod

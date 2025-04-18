@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from torch_geometric.data import Batch
 import numpy as np
 
-from data.misc import pair_attention_transform
+from src.data.misc import pair_attention_transform, transform_dataset_to_pair_dataset_torch
 
 class CustomDataLoader(DataLoader):
     def __init__(self, pairs_and_targets, dataset, batch_size=1, shuffle=False, mode='default', config=None, **kwargs):
@@ -21,7 +21,7 @@ class CustomDataLoader(DataLoader):
         # batch is a list of pairs and targets
         idx_a, idx_b, target = zip(*[(x[0], x[1], x[2]) for x in batch])
         if self.mode == 'default':
-            data = self.get_data_from_indices(idx_a, idx_b)
+            data = self.get_data_from_indices(idx_a, idx_b, unique=True)
             idx_a, idx_b = self.reindex_ids(idx_a, idx_b)
 
             # Create a DataBatch object
@@ -32,28 +32,45 @@ class CustomDataLoader(DataLoader):
             data_batch.idx_b = torch.tensor(idx_b)
             data_batch.y = torch.tensor(target)
         elif self.mode == 'gat_attention':
-            data_a = self.get_data_from_indices(idx_a, [], attention=True)
-            data_b = self.get_data_from_indices(idx_b, [], attention=True)
+            data_a = self.get_data_from_indices(idx_a, [], unique=False)
+            data_b = self.get_data_from_indices(idx_b, [], unique=False)
 
             data_a = Batch.from_data_list(data_a)
             data_b = Batch.from_data_list(data_b)
             data_a.y = torch.tensor(target)
             data_batch = [data_a, data_b]
         elif self.mode == 'nagsl_attention':
-            data_a = self.get_data_from_indices(idx_a, [], attention=True)
-            data_b = self.get_data_from_indices(idx_b, [], attention=True)
+            data_a = self.get_data_from_indices(idx_a, [], unique=False)
+            data_b = self.get_data_from_indices(idx_b, [], unique=False)
 
             data_a = Batch.from_data_list(data_a)
             data_b = Batch.from_data_list(data_b)
             data_batch = pair_attention_transform((data_a, data_b), torch.tensor(target), self.config)
+        elif self.mode == 'my_attention':
+            batch_with_connected_graphs = transform_dataset_to_pair_dataset_torch(self.entire_dataset, batch, self.config)
+            connected_graphs_edge_index = [torch.Tensor(g.edge_index, dtype=torch.int32) for g in batch_with_connected_graphs]
+            num_nodes = [g.num_nodes for g in batch_with_connected_graphs]
+            data = self.get_data_from_indices(idx_a, idx_b, unique=True)
+            idx_a, idx_b = self.reindex_ids(idx_a, idx_b)
+
+            # Create a DataBatch object
+            data_batch = Batch.from_data_list(data)
+
+            # Add idx_a and idx_b to the DataBatch object
+            data_batch.idx_a = torch.tensor(idx_a)
+            data_batch.idx_b = torch.tensor(idx_b)
+            data_batch.y = torch.tensor(target)
+            data_batch.document_id = torch.repeat_interleave(torch.arange(len(num_nodes)), torch.tensor(num_nodes), dim=0, output_size=sum(num_nodes))
+            data_batch.attention_data = connected_graphs_edge_index
         else:
             raise ValueError(f"Unknown mode {self.mode}")
 
         return data_batch
 
-    def get_data_from_indices(self, idx_a, idx_b, attention=False):
-        ids = np.unique(np.concatenate((idx_a, idx_b)))
-        if attention:
+    def get_data_from_indices(self, idx_a, idx_b, unique=False):
+        if unique:
+            ids = np.unique(np.concatenate((idx_a, idx_b)))
+        else:
             ids = idx_a
         required_data = [self.entire_dataset[int(i)] for i in ids]
         return required_data

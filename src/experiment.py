@@ -35,9 +35,9 @@ if __name__ == '__main__':
     # Load + prep data
     if config['mode'] == 'nagsl_attention':
         config = config_add_nagsl(config)
-    if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
+    if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'my_attention':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
-    elif config['mode'] == 'fc_weight' or config['mode'] == 'fc_extra' or config['mode'] == 'my_attention':
+    elif config['mode'] == 'fc_weight' or config['mode'] == 'fc_extra':
         if os.path.isfile(f"data/{config['data_name']}.pkl"):
             with open(f"data/{config['data_name']}.pkl", 'rb') as f:
                 train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking, config['num_node_features'], config['max_num_nodes'] = pickle.load(f)
@@ -57,7 +57,7 @@ if __name__ == '__main__':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
-    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
+    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'my_attention':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_prefs), shuffle=False, mode=config['mode'], config=config)

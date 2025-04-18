@@ -47,22 +47,17 @@ def generate_doc_mask_mod(mask_mod: _mask_mod_signature, offsets: Tensor) -> _ma
         use masking to ensure that the attention scores are only applied to tokens within
         the same document.
     """
-    document_id = torch.tensor([0,0,0,1,1,1,1,2,2,2,3,3,3])#_offsets_to_doc_ids_tensor(offsets)
-    bin_count = torch.bincount(document_id)
+    document_id = torch.tensor([0,0,0,1,1,1,1,2,2,2,3,3,3,4,4,5,5,5])#_offsets_to_doc_ids_tensor(offsets)
     unique = torch.unique(document_id)
     def doc_mask_mod(b, h, q_idx, kv_idx):
-        print(q_idx, kv_idx, document_id, bin_count, unique)
-        # doc_id1 = document_id[0:6]
-        # doc_id2 = document_id[7:]
-        # q_idx1 = q_idx.value
-        # for x in q_idx:
-        #     print(x)
-        dif_doc = ((document_id[q_idx] != document_id[kv_idx])
-                   & (((document_id[q_idx] == unique[0]) & (document_id[kv_idx] == unique[1])) | ((document_id[q_idx] == unique[1]) & (document_id[kv_idx] == unique[0])))
-                   | (((document_id[q_idx] == unique[2]) & (document_id[kv_idx] == unique[3])) | ((document_id[q_idx] == unique[3]) & (document_id[kv_idx] == unique[2])))
-                   )
+        dif_doc = (document_id[q_idx] != document_id[kv_idx])
         same_doc = document_id[q_idx] == document_id[kv_idx]
-        return dif_doc # same_doc
+        operation = False
+        for i in range(0, len(unique), 2):
+            operation = operation | (((document_id[q_idx] == unique[i]) & (document_id[kv_idx] == unique[i + 1])) | (
+                        (document_id[q_idx] == unique[i + 1]) & (document_id[kv_idx] == unique[i])))
+
+        return dif_doc & operation# same_doc
 
     return doc_mask_mod
 
@@ -90,7 +85,7 @@ def main(device: str = "cpu", causal: bool = True):
 
         return lengths
 
-    max_seq_len, doc_count = 13, 3
+    max_seq_len, doc_count = 18, 3
     B, H, SEQ_LEN, HEAD_DIM = 1, 1, max_seq_len, 8
 
     lengths = generate_random_lengths(max_seq_len, doc_count)

@@ -175,7 +175,7 @@ def combine_two_graphs_torch(graph_a, graph_b, bidirectional=False):
     edge_index = data_batch.edge_index
     edge_attr = data_batch.edge_attr
     target = 1 if graph_a.y.item() >= graph_b.y.item() else 0
-    # connect two graphss
+    # connect two graphs
     adj = torch.cartesian_prod(torch.arange(num_nodes_graph_a),
                                torch.arange(num_nodes_graph_a, num_nodes_graph_a + num_nodes_graph_b))
     adj = adj.transpose(0, 1)  # have it look like edge_index
@@ -184,9 +184,10 @@ def combine_two_graphs_torch(graph_a, graph_b, bidirectional=False):
         adj1 = adj[1]
         adj0, adj1 = torch.cat((adj0, adj1)), torch.cat((adj1, adj0))
         adj = torch.stack((adj0, adj1))
+    edge_index = torch.cat((edge_index, adj), axis=1)
     # create new graph
-    new_graph = Data(x=node_features, edge_attr=edge_attr, edge_index=edge_index, y=target, adj=adj,
-                     num_nodes=num_nodes_graph_a + num_nodes_graph_b)
+    new_graph = Data(x=node_features, edge_attr=edge_attr, edge_index=edge_index, y=target,
+                     num_nodes=num_nodes_graph_a+num_nodes_graph_b)
 
     return new_graph
 
