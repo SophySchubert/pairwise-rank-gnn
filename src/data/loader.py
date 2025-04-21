@@ -1,8 +1,9 @@
 import torch
 from torch.utils.data import DataLoader
 from torch_geometric.data import Batch
+from torch_geometric.utils import to_dense_adj
 import numpy as np
-
+from scipy.linalg import block_diag
 from src.data.misc import pair_attention_transform, transform_dataset_to_pair_dataset_torch
 
 class CustomDataLoader(DataLoader):
@@ -48,8 +49,10 @@ class CustomDataLoader(DataLoader):
             data_batch = pair_attention_transform((data_a, data_b), torch.tensor(target), self.config)
         elif self.mode == 'my_attention':
             batch_with_connected_graphs = transform_dataset_to_pair_dataset_torch(self.entire_dataset, batch, self.config)
-            connected_graphs_edge_index = [torch.Tensor(g.edge_index, dtype=torch.int32) for g in batch_with_connected_graphs]
             num_nodes = [g.num_nodes for g in batch_with_connected_graphs]
+            adjacency_matrices = [to_dense_adj(g.edge_index).squeeze(0) for g in batch_with_connected_graphs]
+            attention_data = block_diag(*adjacency_matrices)
+            document_id = torch.repeat_interleave(torch.arange(len(num_nodes)), torch.tensor(num_nodes), dim=0, output_size=sum(num_nodes))
             data = self.get_data_from_indices(idx_a, idx_b, unique=True)
             idx_a, idx_b = self.reindex_ids(idx_a, idx_b)
 
@@ -60,8 +63,9 @@ class CustomDataLoader(DataLoader):
             data_batch.idx_a = torch.tensor(idx_a)
             data_batch.idx_b = torch.tensor(idx_b)
             data_batch.y = torch.tensor(target)
-            data_batch.document_id = torch.repeat_interleave(torch.arange(len(num_nodes)), torch.tensor(num_nodes), dim=0, output_size=sum(num_nodes))
-            data_batch.attention_data = connected_graphs_edge_index
+            data_batch.document_id = document_id
+            data_batch.attention_data = torch.tensor(attention_data)
+            data_batch.unique = self.batch_size
         else:
             raise ValueError(f"Unknown mode {self.mode}")
 

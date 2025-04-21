@@ -56,8 +56,9 @@ def generate_doc_mask_mod(mask_mod: _mask_mod_signature, offsets: Tensor) -> _ma
         for i in range(0, len(unique), 2):
             operation = operation | (((document_id[q_idx] == unique[i]) & (document_id[kv_idx] == unique[i + 1])) | (
                         (document_id[q_idx] == unique[i + 1]) & (document_id[kv_idx] == unique[i])))
+        inner_mask = noop_mask(b, h, q_idx, kv_idx)
 
-        return dif_doc & operation# same_doc
+        return dif_doc & operation & inner_mask
 
     return doc_mask_mod
 
@@ -86,7 +87,7 @@ def main(device: str = "cpu", causal: bool = True):
         return lengths
 
     max_seq_len, doc_count = 18, 3
-    B, H, SEQ_LEN, HEAD_DIM = 1, 1, max_seq_len, 8
+    B, H, SEQ_LEN, HEAD_DIM = 1, 2, max_seq_len, 8
 
     lengths = generate_random_lengths(max_seq_len, doc_count)
 

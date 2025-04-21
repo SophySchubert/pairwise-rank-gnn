@@ -85,9 +85,6 @@ if __name__ == '__main__':
 
 
     # Train and evaluate model
-    logger.info(f'Starting training loop')
-    training_start_time = datetime.now()
-
     train_loader_cached = []
     valid_loader_cached = []
     test_loader_cached = []
@@ -98,7 +95,11 @@ if __name__ == '__main__':
     for data in test_loader:
         test_loader_cached.append(data)
 
+    logger.info(f'Starting training loop')
+    training_start_time = datetime.now()
+
     for epoch in range(config['epochs']):
+        print(f"epoch: {epoch}")
         shuffle(train_loader_cached)
         shuffle(valid_loader_cached)
         train(model, train_loader_cached, device, optimizer, criterion, config['mode'])

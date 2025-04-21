@@ -213,11 +213,17 @@ class RANet(torch.nn.Module):
 
     def forward(self, data):
         # Compute block mask at beginning of forwards due to changing every batch
-        x, edge_index, batch, attention_data, document_id = data.x, data.edge_index, data.batch, data.attention_data, data.document_id
-        ranking_mask = self.generate_doc_mask_mod(document_id)
+        x, edge_index, batch, attention_data, document_id, unique = data.x, data.edge_index, data.batch, data.attention_data, data.document_id, data.unique
+        B, H, Seq_Len, Head_Dim = 1, attention_data.shape[0], attention_data.shape[1], 2
+        query = torch.ones(B, H, Seq_Len, Head_Dim, device=self.device)
+        key = torch.ones(B, H, Seq_Len, Head_Dim, device=self.device)
+        value = attention_data.unsqueeze(0).unsqueeze(3).repeat(1,1,1,2).to(torch.float32).to(self.device)
+        causal_mask = self.generate_doc_mask_mod(document_id, unique)
+        ranking_mask = create_block_mask(mask_mod=causal_mask, B=B, H=H, Q_LEN=Seq_Len, KV_LEN=Seq_Len, device=self.device)
         x = x.type(torch.FloatTensor).to(self.device)
+
         x = self.convIn(x, edge_index)
-        a = flex_attention(query=attention_data, key=attention_data, value=attention_data, block_mask=ranking_mask)
+        a = flex_attention(query=query, key=key, value=value, block_mask=ranking_mask)
         x = F.tanh(x)
         for i in range(self.config['model_layers'] - 2):
             x = self.conv2(x, edge_index)
@@ -238,7 +244,7 @@ class RANet(torch.nn.Module):
 
         return out
 
-    def generate_doc_mask_mod(self, document_id: torch.Tensor) -> _mask_mod_signature:
+    def generate_doc_mask_mod(self, document_id: torch.Tensor, unique: int) -> _mask_mod_signature:
         """Generates mask mods that apply to inputs to flex attention in the sequence stacked
         format.
 
@@ -252,15 +258,26 @@ class RANet(torch.nn.Module):
             use masking to ensure that the attention scores are only applied to tokens within
             the different graphs but of the same pair.
         """
-        unique = torch.unique(document_id)
 
         def doc_mask_mod(b, h, q_idx, kv_idx):
             dif_doc = (document_id[q_idx] != document_id[kv_idx])
             operation = False
-            for i in range(0, len(unique), 2):
-                operation = operation | (((document_id[q_idx] == unique[i]) & (document_id[kv_idx] == unique[i + 1])) | (
-                            (document_id[q_idx] == unique[i + 1]) & (document_id[kv_idx] == unique[i])))
+            for i in range(0, unique, 2):
+                operation = operation | (((document_id[q_idx] == i) & (document_id[kv_idx] == i+1)) | (
+                            (document_id[q_idx] == i+1) & (document_id[kv_idx] == i)))
+            inner_mask = noop_mask(b, h, q_idx, kv_idx)
 
-            return dif_doc & operation
+            return dif_doc & operation & inner_mask
 
         return doc_mask_mod
+
+    def my_mask_mod(self, b, h, q_idx, kv_idx, document_id):
+        unique = torch.unique(document_id)
+        dif_doc = (document_id[q_idx] != document_id[kv_idx])
+        operation = False
+        for i in range(0, len(unique), 2):
+            operation = operation | (((document_id[q_idx] == unique[i]) & (document_id[kv_idx] == unique[i + 1])) | (
+                    (document_id[q_idx] == unique[i + 1]) & (document_id[kv_idx] == unique[i])))
+        inner_mask = noop_mask(b, h, q_idx, kv_idx)
+
+        return dif_doc & operation & inner_mask
