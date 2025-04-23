@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from torch_geometric.data import Batch
-from torch_geometric.utils import to_dense_adj
+from torch_geometric.utils import to_dense_adj, dense_to_sparse, to_torch_sparse_tensor
 import numpy as np
 from scipy.linalg import block_diag
 from src.data.misc import pair_attention_transform, transform_dataset_to_pair_dataset_torch

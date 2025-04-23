@@ -213,8 +213,8 @@ class RANet(torch.nn.Module):
 
     def forward(self, data):
         # Compute block mask at beginning of forwards due to changing every batch
-        x, edge_index, batch, attention_data, document_id, unique = data.x, data.edge_index, data.batch, data.attention_data, data.document_id, data.unique
-        B, H, Seq_Len, Head_Dim = 1, attention_data.shape[0], attention_data.shape[1], 2
+        x, edge_index, batch, attention_data, document_id, unique, idx_a, idx_b = data.x, data.edge_index, data.batch, data.attention_data, data.document_id, data.unique, data.idx_a, data.idx_b
+        B, H, Seq_Len, Head_Dim = 1, 1, attention_data.shape[1], 2
         query = torch.ones(B, H, Seq_Len, Head_Dim, device=self.device)
         key = torch.ones(B, H, Seq_Len, Head_Dim, device=self.device)
         value = attention_data.unsqueeze(0).unsqueeze(3).repeat(1,1,1,2).to(torch.float32).to(self.device)
@@ -224,6 +224,9 @@ class RANet(torch.nn.Module):
 
         x = self.convIn(x, edge_index)
         a = flex_attention(query=query, key=key, value=value, block_mask=ranking_mask)
+        a = torch.mean(a.squeeze(0), dim=-1)
+        a = torch.mean(a, dim=1)
+        a = self.get_attention_score(document_id, a)
         x = F.tanh(x)
         for i in range(self.config['model_layers'] - 2):
             x = self.conv2(x, edge_index)
@@ -240,9 +243,33 @@ class RANet(torch.nn.Module):
         x = self.dropout(x)
 
         out = global_mean_pool(x, batch)
+        out_a, out_b = self.pref_lookup(out, idx_a, idx_b)
+        out = (out_b - out_a) * a
         out = F.sigmoid(out)
 
         return out
+
+    def pref_lookup(self, util, idx_a, idx_b):
+        util = util.squeeze()
+        idx_a = idx_a.to(torch.int64)
+        idx_b = idx_b.to(torch.int64)
+
+        pref_a = torch.gather(util, 0, idx_a)
+        pref_b = torch.gather(util, 0, idx_b)
+        return pref_a, pref_b
+
+    def get_attention_score(self, ids, attention_scores):
+        """
+        Calculate the mean attention score for each graph referenced by id in document_id.
+        """
+        _sum = torch.zeros(ids.max() + 1, dtype=torch.float32).to(self.device)
+        _count = torch.zeros(ids.max() + 1, dtype=torch.float32).to(self.device)
+
+        _sum.scatter_add_(0, ids, attention_scores)
+        _count.scatter_add_(0, ids, torch.ones_like(attention_scores, dtype=torch.float32))
+
+        _mean = _sum / _count
+        return _mean
 
     def generate_doc_mask_mod(self, document_id: torch.Tensor, unique: int) -> _mask_mod_signature:
         """Generates mask mods that apply to inputs to flex attention in the sequence stacked

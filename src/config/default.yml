@@ -5,7 +5,7 @@ logger:
   format: "%(asctime)s - %(levelname)s - %(message)s"
 seed: 42
 epochs: 2
-batch_size: 512
+batch_size: 400
 learning_rate: 0.001
 model_units: 32
 model_layers: 3

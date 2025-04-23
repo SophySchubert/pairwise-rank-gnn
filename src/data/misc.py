@@ -29,7 +29,10 @@ def compare_rankings_with_kendalltau(ranking_a, ranking_b):
 
 def train(model, loader, device, optimizer, criterion, mode='default'):
     model.train()
+    i=0
     for data in loader:
+        print(f"Batch {i}")
+        i+=1
         if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight' or mode == 'my_attention':
             data = data.to(device)
             y = data.y
