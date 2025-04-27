@@ -78,7 +78,7 @@ if __name__ == '__main__':
     elif config['mode'] == 'nagsl_attention':
         model = NAGSLNet(config)
     elif config['mode'] == 'my_attention':
-        model = RANet(config=config)#TODO write its own model
+        model = RANet(config=config)
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
     criterion = torch.nn.BCELoss()
@@ -99,14 +99,13 @@ if __name__ == '__main__':
     training_start_time = datetime.now()
 
     for epoch in range(config['epochs']):
-        print(f"epoch: {epoch}")
         shuffle(train_loader_cached)
         shuffle(valid_loader_cached)
         train(model, train_loader_cached, device, optimizer, criterion, config['mode'])
         train_error, test_acc = evaluate(model, train_loader_cached, device, criterion, config['mode'])
         valid_error, valid_acc = evaluate(model, valid_loader_cached, device, criterion, config['mode'])
         logger.info(f'Epoch: {epoch}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}, Train Acc: {test_acc:.4f}, Valid Acc: {valid_acc:.4f}')
-        if epoch % 25 == 0:
+        if epoch % config['logging_inverval'] == 0:
             torch.save(model.state_dict(), config['folder_path'] + f'/epoch{epoch}_model.pt')
             state = {'epoch': epoch, 'state_dict': model.state_dict(),
                      'optimizer': optimizer.state_dict(), 'losslogger': criterion}
