@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from torch.nn import Linear, Dropout
+from torch.nn import Linear, Dropout, Sequential, Conv2d
 from torch.nn.attention.flex_attention import flex_attention, create_block_mask, _mask_mod_signature, noop_mask
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, EdgeConv
 
@@ -210,11 +210,24 @@ class RANet(torch.nn.Module):
         self.fc2 = Linear(config['model_units'], 32)
         self.fc3 = Linear(32, 1)  # Output 1 for regression
         self.dropout = Dropout(config['model_dropout'])
+        self.mlp = Sequential(
+            Conv2d(A, B),
+            F.relu(),
+            Conv2d(C, D),
+            F.relu(),
+            Conv2d(E, F),
+            F.relu(),
+        )
 
     def forward(self, data):
         # Compute block mask at beginning of forwards due to changing every batch
         x, edge_index, batch, attention_data, document_id, unique, idx_a, idx_b = data.x, data.edge_index, data.batch, data.attention_data, data.document_id, data.unique, data.idx_a, data.idx_b
         B, H, Seq_Len, Head_Dim = 1, 1, attention_data.shape[1], 2
+
+
+
+
+        print("asd")
         query = torch.ones(B, H, Seq_Len, Head_Dim, device=self.device)
         key = torch.ones(B, H, Seq_Len, Head_Dim, device=self.device)
         value = attention_data.unsqueeze(0).unsqueeze(3).repeat(1,1,1,2).to(torch.float32).to(self.device)

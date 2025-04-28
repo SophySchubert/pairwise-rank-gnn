@@ -6,7 +6,7 @@ logger:
 seed: 42
 logging_inverval: 25
 epochs: 2
-batch_size: 400
+batch_size: 15
 learning_rate: 0.001
 model_units: 32
 model_layers: 3
