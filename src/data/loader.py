@@ -4,7 +4,7 @@ from torch_geometric.data import Batch
 from torch_geometric.utils import to_dense_adj, dense_to_sparse, to_torch_sparse_tensor
 import numpy as np
 from scipy.linalg import block_diag
-from src.data.misc import pair_attention_transform, transform_dataset_to_pair_dataset_torch
+from data.misc import pair_attention_transform, transform_dataset_to_pair_dataset_torch
 
 class CustomDataLoader(DataLoader):
     def __init__(self, pairs_and_targets, dataset, batch_size=1, shuffle=False, mode='default', config=None, **kwargs):
@@ -50,21 +50,14 @@ class CustomDataLoader(DataLoader):
         elif self.mode == 'my_attention':
             batch_with_connected_graphs = transform_dataset_to_pair_dataset_torch(self.entire_dataset, batch, self.config)
             num_nodes = [g.num_nodes for g in batch_with_connected_graphs]
-            adjacency_matrices = [to_dense_adj(g.edge_index).squeeze(0) for g in batch_with_connected_graphs]
-            attention_data = block_diag(*adjacency_matrices)
             document_id = torch.repeat_interleave(torch.arange(len(num_nodes)), torch.tensor(num_nodes), dim=0, output_size=sum(num_nodes))
-            data = self.get_data_from_indices(idx_a, idx_b, unique=True)
-            idx_a, idx_b = self.reindex_ids(idx_a, idx_b)
 
             # Create a DataBatch object
-            data_batch = Batch.from_data_list(data)
+            data_batch = Batch.from_data_list(batch_with_connected_graphs)
 
-            # Add idx_a and idx_b to the DataBatch object
-            data_batch.idx_a = torch.tensor(idx_a)
-            data_batch.idx_b = torch.tensor(idx_b)
+            # Add attributes to the DataBatch object
             data_batch.y = torch.tensor(target)
             data_batch.document_id = document_id
-            data_batch.attention_data = torch.tensor(attention_data)
             data_batch.unique = self.batch_size
         else:
             raise ValueError(f"Unknown mode {self.mode}")
@@ -75,7 +68,7 @@ class CustomDataLoader(DataLoader):
         if unique:
             ids = np.unique(np.concatenate((idx_a, idx_b)))
         else:
-            ids = idx_a
+            ids = np.concatenate((idx_a, idx_b))
         required_data = [self.entire_dataset[int(i)] for i in ids]
         return required_data
 

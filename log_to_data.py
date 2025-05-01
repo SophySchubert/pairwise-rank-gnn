@@ -25,7 +25,7 @@ for exp in experiments:
             df.to_pickle('dataframe.pkl')
             df.plot(legend=True)
             plt.xlabel("Epochs")
-            plt.ylabel("Accuracy / Loss")
+            plt.ylabel("Accuracy | Loss")
             plt.savefig('plot.svg')
             plt.close()
             # fig, ax1 = plt.subplots()

@@ -102,8 +102,11 @@ if __name__ == '__main__':
         shuffle(train_loader_cached)
         shuffle(valid_loader_cached)
         train(model, train_loader_cached, device, optimizer, criterion, config['mode'])
+        torch.cuda.empty_cache()
         train_error, test_acc = evaluate(model, train_loader_cached, device, criterion, config['mode'])
+        torch.cuda.empty_cache()
         valid_error, valid_acc = evaluate(model, valid_loader_cached, device, criterion, config['mode'])
+        torch.cuda.empty_cache()
         logger.info(f'Epoch: {epoch}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}, Train Acc: {test_acc:.4f}, Valid Acc: {valid_acc:.4f}')
         if epoch % config['logging_inverval'] == 0:
             torch.save(model.state_dict(), config['folder_path'] + f'/epoch{epoch}_model.pt')

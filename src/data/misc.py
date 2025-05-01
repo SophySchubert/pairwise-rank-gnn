@@ -6,6 +6,7 @@ import torch
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils.convert import to_networkx, from_networkx
 from torch_geometric.utils import to_dense_batch, to_dense_adj
+from tqdm import tqdm
 
 def sample_preference_pairs(graphs):
     c = [(a, b, check_util(graphs, a,b)) for a, b in combinations(range(len(graphs)), 2)]
@@ -29,10 +30,8 @@ def compare_rankings_with_kendalltau(ranking_a, ranking_b):
 
 def train(model, loader, device, optimizer, criterion, mode='default'):
     model.train()
-    i=0
-    for data in loader:
-        print(f"Batch {i}")
-        i+=1
+    for data in tqdm(loader):
+    # for data in loader:
         if mode == 'default' or mode == 'fc_extra' or mode == 'fc_weight' or mode == 'my_attention':
             data = data.to(device)
             y = data.y
