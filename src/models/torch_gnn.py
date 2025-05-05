@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from torch.nn import Linear, Dropout, Sequential, Conv2d
 from torch.nn.attention.flex_attention import flex_attention, create_block_mask, _mask_mod_signature, noop_mask
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, EdgeConv
+from datetime import datetime
 
 from models.misc import create_document_mask
 
@@ -208,27 +209,27 @@ class RANet(torch.nn.Module):
         self.dropout = Dropout(config['model_dropout'])
 
         self.query_mlp = Sequential(
-            Conv2d(32, 64, kernel_size=(1, 1)),
+            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(64, 32, kernel_size=(1, 1)),
+            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(32, 32, kernel_size=(1, 1)),
+            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU()
         )
         self.key_mlp = Sequential(
-            Conv2d(32, 64, kernel_size=(1, 1)),
+            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(64, 32, kernel_size=(1, 1)),
+            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(32, 32, kernel_size=(1, 1)),
+            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU()
         )
         self.value_mlp = Sequential(
-            Conv2d(32, 64, kernel_size=(1, 1)),
+            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(64, 32, kernel_size=(1, 1)),
+            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(32, 32, kernel_size=(1, 1)),
+            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU()
         )
 
@@ -241,26 +242,30 @@ class RANet(torch.nn.Module):
 
         x = self.convIn(x, edge_index)
         x = F.tanh(x)
+        x = self.dropout(x)
         x = self.attention_layer(x, ranking_mask)
+        x = self.dropout(x)
         for i in range(self.config['model_layers'] - 2):
             x = self.conv2(x, edge_index)
             x = F.tanh(x)
             x = self.dropout(x)
             x = self.attention_layer(x, ranking_mask)
+            x = self.dropout(x)
         x = self.convOut(x, edge_index)
         x = F.tanh(x)
         x = self.dropout(x)
         x = self.attention_layer(x, ranking_mask)
+        x = self.dropout(x)
         x = self.fc1(x)
         x = F.tanh(x)
-        x = self.fc2(x)
-        x = F.tanh(x)
-        x = self.fc3(x)
         x = self.dropout(x)
+        x = self.fc2(x)
+        x = self.dropout(x)
+        x = self.fc3(x)
+        x = F.tanh(x)
 
         out = global_mean_pool(x, batch)
         out = F.sigmoid(out)
-
         return out
 
     def attention_layer(self, x, mask):

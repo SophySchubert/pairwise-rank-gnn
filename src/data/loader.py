@@ -48,12 +48,13 @@ class CustomDataLoader(DataLoader):
             data_b = Batch.from_data_list(data_b)
             data_batch = pair_attention_transform((data_a, data_b), torch.tensor(target), self.config)
         elif self.mode == 'my_attention':
+            data = self.get_data_from_indices(idx_a, idx_b, unique=False)
             batch_with_connected_graphs = transform_dataset_to_pair_dataset_torch(self.entire_dataset, batch, self.config)
             num_nodes = [g.num_nodes for g in batch_with_connected_graphs]
             document_id = torch.repeat_interleave(torch.arange(len(num_nodes)), torch.tensor(num_nodes), dim=0, output_size=sum(num_nodes))
 
             # Create a DataBatch object
-            data_batch = Batch.from_data_list(batch_with_connected_graphs)
+            data_batch = Batch.from_data_list(data)
 
             # Add attributes to the DataBatch object
             data_batch.y = torch.tensor(target)

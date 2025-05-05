@@ -82,6 +82,7 @@ if __name__ == '__main__':
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
     criterion = torch.nn.BCELoss()
+    torch.compile(model, backend="cudagraphs")
 
 
     # Train and evaluate model
