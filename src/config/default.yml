@@ -4,13 +4,14 @@ logger:
   level: 10 # CRITICAL = 50, ERROR = 40, WARNING = 30, INFO = 20, DEBUG = 10, NOTSET = 0
   format: "%(asctime)s - %(levelname)s - %(message)s"
 seed: 42
-logging_inverval: 25
-epochs: 201
-batch_size: 256
-learning_rate: 0.003
+logging_inverval: 5
+epochs: 11
+batch_size: 128
+learning_rate: 0.01 #als nächstes
 model_units: 32
+model_units2: 32
 model_layers: 2
-model_dropout: 0.6
+model_dropout: 0.5
 dataset: ogbg-molfreesolv #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC
 mode: my_attention # default, fc_weight, fc_extra, gat_attention, nagsl_attention, my_attention
 bidirectional: True

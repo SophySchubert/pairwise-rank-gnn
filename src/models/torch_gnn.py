@@ -5,7 +5,6 @@ from torch.nn.attention.flex_attention import flex_attention, create_block_mask,
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, EdgeConv
 from datetime import datetime
 
-from models.misc import create_document_mask
 
 class RankGNN(torch.nn.Module):
     ''' Pairwise GraphConvolutionNetwork
@@ -209,82 +208,89 @@ class RANet(torch.nn.Module):
         self.dropout = Dropout(config['model_dropout'])
 
         self.query_mlp = Sequential(
-            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
+            Linear(config['model_units'], config['model_units2']),
+            # Conv2d(config['model_units'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
+            Linear(config['model_units2'], config['model_units2']),
+#             Conv2d(config['model_units2'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
+            Linear(config['model_units2'], config['model_units']),
+#             Conv2d(config['model_units2'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU()
         )
         self.key_mlp = Sequential(
-            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
+            Linear(config['model_units'], config['model_units2']),
+#             Conv2d(config['model_units'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
+            Linear(config['model_units2'], config['model_units2']),
+#             Conv2d(config['model_units2'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
+            Linear(config['model_units2'], config['model_units']),
+#             Conv2d(config['model_units2'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU()
         )
         self.value_mlp = Sequential(
-            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
+            Linear(config['model_units'], config['model_units2']),
+#             Conv2d(config['model_units'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
+            Linear(config['model_units2'], config['model_units2']),
+#             Conv2d(config['model_units2'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
-            Conv2d(config['model_units'], config['model_units'], kernel_size=(1, 1), device=config['device']),
+            Linear(config['model_units2'], config['model_units']),
+#             Conv2d(config['model_units2'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU()
         )
 
     def forward(self, data):
         # Compute block mask at beginning of forwards due to changing every batch
-        x, edge_index, batch, document_id, unique = data.x, data.edge_index, data.batch, data.document_id, data.unique
+        x, edge_index, batch, document_id, unique, idx_a, idx_b = data.x, data.edge_index, data.batch, data.document_id, data.unique, data.idx_a, data.idx_b
         causal_mask = self.generate_doc_mask_mod(document_id, unique)
         ranking_mask = create_block_mask(mask_mod=causal_mask, B=1, H=1, Q_LEN=x.shape[0], KV_LEN=x.shape[0], device=self.device)
         x = x.type(torch.FloatTensor).to(self.device)
 
         x = self.convIn(x, edge_index)
         x = F.tanh(x)
-        x = self.dropout(x)
         x = self.attention_layer(x, ranking_mask)
-        x = self.dropout(x)
         for i in range(self.config['model_layers'] - 2):
             x = self.conv2(x, edge_index)
             x = F.tanh(x)
             x = self.dropout(x)
             x = self.attention_layer(x, ranking_mask)
-            x = self.dropout(x)
         x = self.convOut(x, edge_index)
         x = F.tanh(x)
         x = self.dropout(x)
         x = self.attention_layer(x, ranking_mask)
-        x = self.dropout(x)
         x = self.fc1(x)
         x = F.tanh(x)
-        x = self.dropout(x)
         x = self.fc2(x)
-        x = self.dropout(x)
-        x = self.fc3(x)
         x = F.tanh(x)
+        x = self.fc3(x)
+        x = self.dropout(x)
 
-        out = global_mean_pool(x, batch)
+        x_util = global_mean_pool(x, batch)
+
+        x_a, x_b = self.pref_lookup(x_util, idx_a, idx_b)
+        out = x_b - x_a
+
         out = F.sigmoid(out)
+
         return out
 
     def attention_layer(self, x, mask):
-        a_q = self.query_mlp(x.view(x.shape[0], x.shape[1], 1, 1))
-        a_k = self.key_mlp(x.view(x.shape[0], x.shape[1], 1, 1))
-        a_v = self.value_mlp(x.view(x.shape[0], x.shape[1], 1, 1))
-        x = flex_attention(query=a_q.permute(2,3,0,1),
-                           key=a_k.permute(2,3,0,1),
-                           value=a_v.permute(2,3,0,1),
+        a_q = self.query_mlp(x)
+        a_k = self.key_mlp(x)
+        a_v = self.value_mlp(x)
+        x = flex_attention(query=a_q.unsqueeze(0).unsqueeze(0),
+                           key=a_k.unsqueeze(0).unsqueeze(0),
+                           value=a_v.unsqueeze(0).unsqueeze(0),
                            block_mask=mask)
         return x.squeeze(0).squeeze(0)
 
     def pref_lookup(self, util, idx_a, idx_b):
         util = util.squeeze()
-        idx_a = idx_a.to(torch.int64)
-        idx_b = idx_b.to(torch.int64)
 
-        pref_a = torch.gather(util, 0, idx_a)
-        pref_b = torch.gather(util, 0, idx_b)
+        pref_a = torch.gather(util, 0, idx_a.to(torch.int64))
+        pref_b = torch.gather(util, 0, idx_b.to(torch.int64))
         return pref_a, pref_b
 
     def generate_doc_mask_mod(self, document_id: torch.Tensor, unique: int) -> _mask_mod_signature:

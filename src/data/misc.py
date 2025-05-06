@@ -205,16 +205,23 @@ def transform_dataset_to_pair_dataset(dataset, prefs, config):
         new_dataset.append(combined_graph)
     return new_dataset
 
-def transform_dataset_to_pair_dataset_torch(dataset, prefs, config):
+def transform_dataset_to_pair_dataset_torch(dataset, prefs, config, from_loader=False):
     '''
     Transforms every pair from prefs into a new combined graph
     '''
     new_dataset = []
+    if from_loader:
+        _d = []
     for pref in prefs:
         g_1, g_2 = dataset[pref[0]], dataset[pref[1]]
         combined_graph = combine_two_graphs_torch(graph_a=g_1, graph_b=g_2, bidirectional=config['bidirectional'])
+        if from_loader:
+            _d.append(g_1)
+            _d.append(g_2)
         assert(combined_graph.y == pref[2])
         new_dataset.append(combined_graph)
+    if from_loader:
+        return new_dataset, _d
     return new_dataset
 
 def preprocess_predictions(raw_predictions):
