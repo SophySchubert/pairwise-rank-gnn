@@ -1,12 +1,16 @@
 import torch
 from torch.utils.data import DataLoader
 from torch_geometric.data import Batch
-from torch_geometric.utils import to_dense_adj, dense_to_sparse, to_torch_sparse_tensor
 import numpy as np
-from scipy.linalg import block_diag
-from data.misc import pair_attention_transform, transform_dataset_to_pair_dataset_torch
+from src.data.misc import nagsl_pair_attention_transform, transform_dataset_to_pair_dataset_torch
 
 class CustomDataLoader(DataLoader):
+    """
+    Custom DataLoader for pairwise graph data used in this framework.
+    Based on PyTorch Geometric's DataLoader.
+    The default attribute for the dataset is used for the pairs to be sampled in each batch.
+    Entire dataset is stored in the entire_dataset attribute.
+    """
     def __init__(self, pairs_and_targets, dataset, batch_size=1, shuffle=False, mode='default', config=None, **kwargs):
         super().__init__(pairs_and_targets, batch_size=batch_size, shuffle=shuffle, **kwargs)
         self.entire_dataset = dataset
@@ -19,11 +23,15 @@ class CustomDataLoader(DataLoader):
             yield batch
 
     def augment_batch(self, batch):
-        # batch is a list of pairs and targets
+        '''
+        Take each batch and load required data from the entire dataset
+        Batch is a list of pairs and targets
+        '''
+
         idx_a, idx_b, target = zip(*[(x[0], x[1], x[2]) for x in batch])
         if self.mode == 'default':
-            data = self.get_data_from_indices(idx_a, idx_b, unique=True)
-            idx_a, idx_b = self.reindex_ids(idx_a, idx_b)
+            data = self.get_data_from_indices(idx_a, idx_b, unique=True) # retrieve data from dataset
+            idx_a, idx_b = self.reindex_ids(idx_a, idx_b) # reindex ids to not get a out of bounds error in the NN
 
             # Create a DataBatch object
             data_batch = Batch.from_data_list(data)
@@ -32,6 +40,7 @@ class CustomDataLoader(DataLoader):
             data_batch.idx_a = torch.tensor(idx_a)
             data_batch.idx_b = torch.tensor(idx_b)
             data_batch.y = torch.tensor(target)
+
         elif self.mode == 'gat_attention':
             data_a = self.get_data_from_indices(idx_a, [], unique=False)
             data_b = self.get_data_from_indices(idx_b, [], unique=False)
@@ -39,18 +48,23 @@ class CustomDataLoader(DataLoader):
             data_a = Batch.from_data_list(data_a)
             data_b = Batch.from_data_list(data_b)
             data_a.y = torch.tensor(target)
-            data_batch = [data_a, data_b]
+            data_batch = [data_a, data_b] # this mode uses a different way to get the pairwise data
+
         elif self.mode == 'nagsl_attention':
+            # NAGSL framework
             data_a = self.get_data_from_indices(idx_a, [], unique=False)
             data_b = self.get_data_from_indices(idx_b, [], unique=False)
 
             data_a = Batch.from_data_list(data_a)
             data_b = Batch.from_data_list(data_b)
-            data_batch = pair_attention_transform((data_a, data_b), torch.tensor(target), self.config)
-        elif self.mode == 'my_attention':
+            data_batch = nagsl_pair_attention_transform((data_a, data_b), torch.tensor(target), self.config)
+
+        elif self.mode == 'rank_mask':
             idx_a, idx_b = self.reindex_ids(idx_a, idx_b)
             batch_with_connected_graphs, data = transform_dataset_to_pair_dataset_torch(self.entire_dataset, batch, self.config, True)
+            # Take number of nodes per graph
             num_nodes = [g.num_nodes for g in data]
+            # And create an array of ids referencing a certain graph - needed for the ranking mask
             document_id = torch.repeat_interleave(torch.arange(len(num_nodes)), torch.tensor(num_nodes), dim=0, output_size=sum(num_nodes))
 
             # Create a DataBatch object
@@ -70,7 +84,11 @@ class CustomDataLoader(DataLoader):
         return data_batch
 
     def get_data_from_indices(self, idx_a, idx_b, unique=False):
+        '''
+        Return a sub dataset from the ids of the batch
+        '''
         if unique:
+            # Some methods do not need duplicates, pairs then get referenced by ids
             ids = np.unique(np.concatenate((idx_a, idx_b)))
         else:
             ids = np.concatenate((idx_a, idx_b))
@@ -78,9 +96,11 @@ class CustomDataLoader(DataLoader):
         return required_data
 
     def reindex_ids(self, idx_a, idx_b):
+        '''
+        Transforms the ids of a batch to be of in the same range as the batch size
+        Before reindexing ids reference the entire dataset afterwards they reference the batch.
+        '''
         ids = np.unique(np.concatenate((idx_a, idx_b)))
-        idx_a = np.array(idx_a)
-        idx_b = np.array(idx_b)
 
         # Create a mapping from unique elements to the range [0, length)
         mapping = {element: idx for idx, element in enumerate(ids)}

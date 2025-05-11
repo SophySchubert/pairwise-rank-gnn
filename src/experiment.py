@@ -12,14 +12,14 @@ from random import shuffle
 from misc import setup_experiment, setup_logger, config_add_nagsl
 from data.load import get_data
 from data.loader import CustomDataLoader
-from models.torch_gnn import RankGNN, RankGAN, PairRankGNN, PairRankGNN2, RANet
+from models.torch_gnn import RankGNN, RankGAT, PairRankGNN, PairRankGNN2, RANet
 from models.NAGSL.NAGSL import NAGSLNet
 from data.misc import compare_rankings_with_kendalltau, rank_data, train, evaluate, predict, preprocess_predictions, retrieve_preference_counts_from_predictions
 
 if __name__ == '__main__':
     start_time = datetime.now()
     ######################################################################
-    # CONFIG
+    # CONFIG + SETUP
     config = setup_experiment(sys.argv[1])
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     config['device'] = device
@@ -27,17 +27,17 @@ if __name__ == '__main__':
     logger = setup_logger(config['folder_path'], lvl=config['logger']['level'])
     copyfile('src/models/torch_gnn.py', config['folder_path']+'/torch_gnn.py')
     logger.info(f'Starting at {start_time}')
-    # SETUP
-    # np.random.seed(config['seed'])
-    # torch.manual_seed(config['seed'])
-    seed_everything(config['seed'])
+
+    seed_everything(config['seed']) # set seed for reproducibility
     ######################################################################
+    # DATA PREPARATION
     # Load + prep data
     if config['mode'] == 'nagsl_attention':
         config = config_add_nagsl(config)
-    if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'my_attention':
+    if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
-    elif config['mode'] == 'fc_weight' or config['mode'] == 'fc_extra':
+    elif config['mode'] == 'fc' or config['mode'] == 'fc_extra':
+        # Saving and loading of pickled data, to speedup the process if the same data is used
         if os.path.isfile(f"data/{config['data_name']}.pkl"):
             with open(f"data/{config['data_name']}.pkl", 'rb') as f:
                 train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking, config['num_node_features'], config['max_num_nodes'] = pickle.load(f)
@@ -52,40 +52,41 @@ if __name__ == '__main__':
     data_prep_end_time = datetime.now()
     logger.info(f'Data prep took {data_prep_end_time - start_time}')
 
-    # Create data loaders
+    # DataLoaders
     if config['mode'] == 'default':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
-    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'my_attention':
+    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_prefs), shuffle=False, mode=config['mode'], config=config)
-    else:# fc_weight, fc_extra or my_attention
+    else:# fc, fc_extra
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
 
+    ######################################################################
+    # MODEL + TRAINING
     # Create model, optimizer, and loss function
     if config['mode'] == 'default':
         model = RankGNN(num_node_features=config['num_node_features'], device=device, config=config)
     elif config['mode'] == 'gat_attention':
-        model = RankGAN(num_node_features=config['num_node_features'], device=device, config=config)
-    elif config['mode'] == 'fc_weight':
+        model = RankGAT(num_node_features=config['num_node_features'], device=device, config=config)
+    elif config['mode'] == 'fc':
         model = PairRankGNN(num_node_features=config['num_node_features'], device=device, config=config)
     elif config['mode'] == 'fc_extra':
         model = PairRankGNN2(num_node_features=config['num_node_features'], device=device, config=config)
     elif config['mode'] == 'nagsl_attention':
         model = NAGSLNet(config)
-    elif config['mode'] == 'my_attention':
+    elif config['mode'] == 'rank_mask':
         model = RANet(config=config)
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
     criterion = torch.nn.BCELoss()
     torch.compile(model, backend="cudagraphs")
 
-
-    # Train and evaluate model
+    # Cache the DataLoader to speed up training
     train_loader_cached = []
     valid_loader_cached = []
     test_loader_cached = []
@@ -99,16 +100,19 @@ if __name__ == '__main__':
     logger.info(f'Starting training loop')
     training_start_time = datetime.now()
 
+    # Training loop
     for epoch in range(config['epochs']):
+        # shuffle cached dataloader
         shuffle(train_loader_cached)
         shuffle(valid_loader_cached)
         train(model, train_loader_cached, device, optimizer, criterion, config['mode'])
-        torch.cuda.empty_cache()
+        torch.cuda.empty_cache() # empty cache to avoid no longer needed data in GPU memory
         train_error, test_acc = evaluate(model, train_loader_cached, device, criterion, config['mode'])
         torch.cuda.empty_cache()
         valid_error, valid_acc = evaluate(model, valid_loader_cached, device, criterion, config['mode'])
         torch.cuda.empty_cache()
         logger.info(f'Epoch: {epoch}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}, Train Acc: {test_acc:.4f}, Valid Acc: {valid_acc:.4f}')
+        # save model and state every logging_interval epochs
         if epoch % config['logging_inverval'] == 0:
             torch.save(model.state_dict(), config['folder_path'] + f'/epoch{epoch}_model.pt')
             state = {'epoch': epoch, 'state_dict': model.state_dict(),
@@ -130,6 +134,8 @@ if __name__ == '__main__':
             tau, p_value = compare_rankings_with_kendalltau(test_ranking, predicted_ranking)
             logger.info(f'Kendall`s Tau: {tau}, P-value: {p_value}')
 
+    ######################################################################
+    # TESTING and INFERENCE of MODEL
     test_error, test_acc = evaluate(model, test_loader_cached, device, criterion, config['mode'])
     logger.info(f'Test Error: {test_error:.4f}, Test Acc: {test_acc:.4f}')
     training_end_time = datetime.now()

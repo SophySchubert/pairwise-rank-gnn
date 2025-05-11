@@ -1,15 +1,18 @@
 import torch
 import torch.nn.functional as F
-from torch.nn import Linear, Dropout, Sequential, Conv2d
+from torch.nn import Linear, Dropout, Sequential, ReLU
 from torch.nn.attention.flex_attention import flex_attention, create_block_mask, _mask_mod_signature, noop_mask
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, EdgeConv
-from datetime import datetime
 
+'''
+Graph Neural Networks
+'''
 
 class RankGNN(torch.nn.Module):
     ''' Pairwise GraphConvolutionNetwork
         data are graphs
         pairs are referenced by the idx_*
+        mode in config: 'default'
     '''
     def __init__(self, num_node_features=9, device='cpu', config=None):
         super().__init__()
@@ -35,6 +38,8 @@ class RankGNN(torch.nn.Module):
     def forward(self, data):
         x, edge_index, batch, idx_a, idx_b = data.x, data.edge_index, data.batch, data.idx_a, data.idx_b
         x = x.type(torch.FloatTensor).to(self.device)
+
+        # Convolutional layers for graph processing
         x = self.convIn(x, edge_index)
         x = F.tanh(x)
         for i in range(self.config['model_layers'] - 2):
@@ -44,6 +49,7 @@ class RankGNN(torch.nn.Module):
         x = self.convOut(x, edge_index)
         x = F.tanh(x)
         x = self.dropout(x)
+        # Fully connected MLP for further extraction of features
         x = self.fc1(x)
         x = F.tanh(x)
         x = self.fc2(x)
@@ -51,18 +57,21 @@ class RankGNN(torch.nn.Module):
         x = self.fc3(x)
         x = self.dropout(x)
 
+        # Global pooling to get a single vector for each graph
         x_util = global_mean_pool(x, batch)
 
-        x_a, x_b = self.pref_lookup(x_util, idx_a, idx_b)
-        out = x_b - x_a
-        out = F.sigmoid(out)
+        # Actuall pairwise comparing module of the NN
+        x_a, x_b = self.pref_lookup(x_util, idx_a, idx_b)# Lookup of preferences for the pairs
+        out = x_b - x_a # Subtraction of the two preferences
+        out = F.sigmoid(out) # Last activation to squash the output to [0,1]
 
         return out, x_util
 
-class RankGAN(torch.nn.Module):
+class RankGAT(torch.nn.Module):
     ''' Pairwise GraphAttentionNetwork
         data are graphs
-        pairs are given by the batch and then compared via pref_lookup()
+        pairs are given by the batch and then compared via subtraction
+        mode in config: 'gat_attention'
     '''
     def __init__(self, num_node_features=9, device='cpu', config=None):
         super().__init__()
@@ -136,64 +145,110 @@ class RankGAN(torch.nn.Module):
 class PairRankGNN(torch.nn.Module):
     ''' Pairwise GraphConvolution Network
         data represents the fully connected graph pairs (no idx_* needed)
+        mode in config: 'fc'
     '''
     def __init__(self, num_node_features=9, device='cpu', config=None):
-        raise("IMPLEMENT ME ")
         super(PairRankGNN, self).__init__()
         self.num_node_features = num_node_features
         self.device = device
         self.config = config
-        self.conv1 = GCNConv(self.num_node_features, config['model_units'])
+        self.convIn = GCNConv(self.num_node_features, config['model_units'])
         self.conv2 = GCNConv(config['model_units'], config['model_units'])
-        self.fc = Linear(config['model_units'], 1)  # Output 1 for regression
+        self.convOut = GCNConv(config['model_units'], config['model_units'])
+        self.fc1 = Linear(config['model_units'], config['model_units'])
+        self.fc2 = Linear(config['model_units'], 32)
+        self.fc3 = Linear(32, 1)  # Output 1 for regression
+        self.dropout = Dropout(config['model_dropout'])
 
     def forward(self, data):
         x, edge_index, batch = data.x, data.edge_index, data.batch
         x = x.type(torch.FloatTensor).to(self.device)
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = self.conv2(x, edge_index)
-        x = F.relu(x)
-        x = self.fc(x)
-        out = global_mean_pool(x, batch)
-        out = F.sigmoid(out)
+        x = self.convIn(x, edge_index)
+        x = F.tanh(x)
+        for i in range(self.config['model_layers'] - 2):
+            x = self.conv2(x, edge_index)
+            x = F.tanh(x)
+            x = self.dropout(x)
+        x = self.convOut(x, edge_index)
+        x = F.tanh(x)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = F.tanh(x)
+        x = self.fc2(x)
+        x = F.tanh(x)
+        x = self.fc3(x)
+        x = self.dropout(x)
+
+        x = global_mean_pool(x, batch)
+        out = F.sigmoid(x)
+
         return out
 
 class PairRankGNN2(torch.nn.Module):
     ''' Pairwise GraphConvolution Network
         data represents the fully connected graph pairs (no idx_* needed)
-        new edge connections are stored separately
+        Also uses EdgeConv-Layers
+        mode in config: 'fc_extra'
     '''
     def __init__(self, num_node_features=9, device='cpu', config=None):
-        raise("IMPLEMENT ME ")
         super(PairRankGNN2, self).__init__()
         self.num_node_features = num_node_features
         self.device = device
         self.config = config
         self.conv1 = GCNConv(self.num_node_features, config['model_units'])
-        self.edge1 = EdgeConv(config['model_units'], config['model_units'])
-        self.conv2 = GCNConv(config['model_units'], 32)
-        self.edge2 = EdgeConv(32, 32)
-        self.fc = Linear(32, 1)  # Output 1 for regression
+        self.conv2 = GCNConv(config['model_units'], config['model_units'])
+        self.fc1 = Linear(config['model_units'], config['model_units'])
+        self.fc2 = Linear(config['model_units'], 32)
+        self.fc3 = Linear(32, 1)  # Output 1 for regression
+        self.dropout = Dropout(config['model_dropout'])
 
     def forward(self, data):
-        x, edge_index, adj, batch= data.x, data.edge_index, data.adj, data.batch
+        x, edge_index, batch= data.x, data.edge_index, data.batch
+        x = x.type(torch.FloatTensor).to(self.device)
+        edge = EdgeConv(nn=torch.nn.Sequential(
+            Linear(edge_index.shape[1], edge_index.shape[1]),
+            ReLU(),
+            Linear(edge_index.shape[1], edge_index.shape[1])
+        ))
+        edge = edge.to(self.device)
+
         x = x.type(torch.FloatTensor).to(self.device)
         x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = self.edge1(x, adj)
-        x = F.relu(x)
+        x = F.tanh(x)
+        x = edge(x, edge_index)
+        x = F.tanh(x)
+        for i in range(self.config['model_layers'] - 2):
+            x = self.conv2(x, edge_index)
+            x = F.tanh(x)
+            x = self.dropout(x)
+            x = self.edge(x, edge_index)
+            x = F.tanh(x)
+            x = self.dropout(x)
         x = self.conv2(x, edge_index)
-        x = F.relu(x)
-        x = self.edge2(x, adj)
-        x = F.relu(x)
-        x = self.fc(x)
-        out = global_mean_pool(x, batch)
-        out = F.sigmoid(out)
+        x = F.tanh(x)
+        x = self.dropout(x)
+        x = self.edge(x, edge_index)
+        x = F.tanh(x)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = F.tanh(x)
+        x = self.fc2(x)
+        x = F.tanh(x)
+        x = self.fc3(x)
+        x = self.dropout(x)
+
+        x = global_mean_pool(x, batch)
+        out = F.sigmoid(x)
+
         return out
 
 class RANet(torch.nn.Module):
-    ''' Rank Attention Network
+    '''
+    Ranking Mask Attention Network - main part of this research and framework
+    data are graphs
+    pairs are referenced by the idx_*
+    utilises flex_attention from pytorch (version>=2.5)
+    mode in config: 'rank_mask'
     '''
     def __init__(self, config=None):
         super(RANet, self).__init__()
@@ -206,38 +261,29 @@ class RANet(torch.nn.Module):
         self.fc2 = Linear(config['model_units'], 32)
         self.fc3 = Linear(32, 1)  # Output 1 for regression
         self.dropout = Dropout(config['model_dropout'])
-
+        # QKV MLPs for attention
         self.query_mlp = Sequential(
             Linear(config['model_units'], config['model_units2']),
-            # Conv2d(config['model_units'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
             Linear(config['model_units2'], config['model_units2']),
-#             Conv2d(config['model_units2'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
             Linear(config['model_units2'], config['model_units']),
-#             Conv2d(config['model_units2'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU()
         )
         self.key_mlp = Sequential(
             Linear(config['model_units'], config['model_units2']),
-#             Conv2d(config['model_units'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
             Linear(config['model_units2'], config['model_units2']),
-#             Conv2d(config['model_units2'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
             Linear(config['model_units2'], config['model_units']),
-#             Conv2d(config['model_units2'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU()
         )
         self.value_mlp = Sequential(
             Linear(config['model_units'], config['model_units2']),
-#             Conv2d(config['model_units'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
             Linear(config['model_units2'], config['model_units2']),
-#             Conv2d(config['model_units2'], config['model_units2'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU(),
             Linear(config['model_units2'], config['model_units']),
-#             Conv2d(config['model_units2'], config['model_units'], kernel_size=(1, 1), device=config['device']),
             torch.nn.ReLU()
         )
 
@@ -277,9 +323,11 @@ class RANet(torch.nn.Module):
         return out
 
     def attention_layer(self, x, mask):
+        # calculates the QKV matrices for the flex attention
         a_q = self.query_mlp(x)
         a_k = self.key_mlp(x)
         a_v = self.value_mlp(x)
+        # calculates the attention scores
         x = flex_attention(query=a_q.unsqueeze(0).unsqueeze(0),
                            key=a_k.unsqueeze(0).unsqueeze(0),
                            value=a_v.unsqueeze(0).unsqueeze(0),
@@ -300,6 +348,7 @@ class RANet(torch.nn.Module):
         Args:
             docment_id: A tensor that contains a unique id for each graph and has the length of the number of nodes in the graph-batch. Each id has the
                         length of the number of nodes in the graph.
+            unique: The number of unique document ids in the batch. This is the number of graphs in the batch and original batch size.
 
         Note:
             What is the sequence stacked format? When assembling batches of inputs, we
@@ -308,13 +357,16 @@ class RANet(torch.nn.Module):
             the different graphs but of the same pair.
         """
         def doc_mask_mod(b, h, q_idx, kv_idx):
-            dif_doc = (document_id[q_idx] != document_id[kv_idx])
+            # calculates a mask mod that only is True in areas where the connection between graphs is.
+            # The rest is False
+            diff_doc = (document_id[q_idx] != document_id[kv_idx]) # the first pair
             operation = False
             for i in range(0, unique, 2):
+                # all following pair id combinations are calculated in this loop
                 operation = operation | (((document_id[q_idx] == i) & (document_id[kv_idx] == i+1)) | (
                             (document_id[q_idx] == i+1) & (document_id[kv_idx] == i)))
-            inner_mask = noop_mask(b, h, q_idx, kv_idx)
+            inner_mask = noop_mask(b, h, q_idx, kv_idx) # simple noop_mask
 
-            return dif_doc & operation & inner_mask
+            return diff_doc & operation & inner_mask # combine all 3 masks
 
         return doc_mask_mod

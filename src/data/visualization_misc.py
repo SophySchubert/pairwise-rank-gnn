@@ -2,6 +2,9 @@ import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 import networkx as nx
 
+'''
+Visualisation of a graph - not needed for the framework
+'''
 def vis(graph):
     '''
     Visualize a graph from TUDataset with Plotly
