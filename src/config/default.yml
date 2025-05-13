@@ -4,18 +4,18 @@ logger:
   level: 10 # CRITICAL = 50, ERROR = 40, WARNING = 30, INFO = 20, DEBUG = 10, NOTSET = 0
   format: "%(asctime)s - %(levelname)s - %(message)s"
 seed: 42
-logging_inverval: 5
+logging_interval: 5
 epochs: 201
 batch_size: 512
 learning_rate: 0.001
 model_units: 32
 model_units2: 32
-model_layers: 2
+model_layers: 2 # >= 1
 model_dropout: 0.5
 dataset: ogbg-molfreesolv #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC
 mode: rank_mask # default, fc, fc_extra, gat_attention, nagsl_attention, rank_mask
 bidirectional: False
-new_grap_edge_value:
+new_graph_edge_value:
   - 0
   - 0
   - 0

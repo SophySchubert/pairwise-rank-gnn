@@ -34,9 +34,9 @@ if __name__ == '__main__':
     # Load + prep data
     if config['mode'] == 'nagsl_attention':
         config = config_add_nagsl(config)
-    if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
+    if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
-    elif config['mode'] == 'fc' or config['mode'] == 'fc_extra':
+    elif config['mode'] == 'fc' or config['mode'] == 'fc_extra' or config['mode'] == 'rank_mask':
         # Saving and loading of pickled data, to speedup the process if the same data is used
         if os.path.isfile(f"data/{config['data_name']}.pkl"):
             with open(f"data/{config['data_name']}.pkl", 'rb') as f:
@@ -57,11 +57,11 @@ if __name__ == '__main__':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
-    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
+    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_prefs), shuffle=False, mode=config['mode'], config=config)
-    else:# fc, fc_extra
+    else:# fc, fc_extra, rank_mask # or config['mode'] == 'rank_mask'
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     elif config['mode'] == 'nagsl_attention':
         model = NAGSLNet(config)
     elif config['mode'] == 'rank_mask':
-        model = RANet(config=config)
+        model = RANet(num_node_features=config['num_node_features'], device=device, config=config)
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
     criterion = torch.nn.BCELoss()
@@ -113,7 +113,7 @@ if __name__ == '__main__':
         torch.cuda.empty_cache()
         logger.info(f'Epoch: {epoch}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}, Train Acc: {test_acc:.4f}, Valid Acc: {valid_acc:.4f}')
         # save model and state every logging_interval epochs
-        if epoch % config['logging_inverval'] == 0:
+        if epoch % config['logging_interval'] == 0:
             torch.save(model.state_dict(), config['folder_path'] + f'/epoch{epoch}_model.pt')
             state = {'epoch': epoch, 'state_dict': model.state_dict(),
                      'optimizer': optimizer.state_dict(), 'losslogger': criterion}

@@ -212,7 +212,7 @@ def combine_two_graphs_torch(graph_a, graph_b, bidirectional=False):
     edge_index = torch.cat((edge_index, adj), axis=1)
     # create new graph
     new_graph = Data(x=node_features, edge_attr=edge_attr, edge_index=edge_index, y=target,
-                     num_nodes=num_nodes_graph_a+num_nodes_graph_b)
+                     num_nodes=num_nodes_graph_a+num_nodes_graph_b, g_1=graph_a.num_nodes, g_2=graph_b.num_nodes)
 
     return new_graph
 
@@ -224,7 +224,7 @@ def transform_dataset_to_pair_dataset(dataset, prefs, config):
     new_dataset = []
     for pref in prefs:
         g_1, g_2 = dataset[pref[0]], dataset[pref[1]]
-        combined_graph = combine_two_graphs(graph_a=g_1, graph_b=g_2, default_value=config['new_grap_edge_value'])
+        combined_graph = combine_two_graphs(graph_a=g_1, graph_b=g_2, default_value=config['new_graph_edge_value'])
         assert(combined_graph.y == pref[2])
         new_dataset.append(combined_graph)
     return new_dataset
