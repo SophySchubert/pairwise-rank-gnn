@@ -60,7 +60,7 @@ def train(model, loader, device, optimizer, criterion, mode='default'):
             data = [tmp_0, tmp_1]
             y = data[0].y
         optimizer.zero_grad()
-        if mode == 'default':
+        if mode == 'default' or mode == 'rank_mask':
             pref, util = model(data)
         else:
             pref = model(data)
@@ -89,7 +89,7 @@ def evaluate(model, loader, device, criterion, mode='default'):
                 data = [tmp_0, tmp_1]
                 y = data[0].y
 
-            if mode == 'default':
+            if mode == 'default' or mode == 'rank_mask':
                 pref, util = model(data)
             else:
                 pref = model(data).squeeze()
@@ -119,7 +119,7 @@ def predict(model, loader, device, mode='default'):
                 tmp_1 = data[1].to(device)
                 data = [tmp_0, tmp_1]
 
-            if mode == 'default':
+            if mode == 'default' or mode == 'rank_mask':
                 pref, util = model(data)
                 pref = (pref >= 0.5).float()
                 pref = pref.detach().cpu().numpy()

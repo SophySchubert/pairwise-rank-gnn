@@ -51,9 +51,9 @@ def get_data(config):
     if config['mode'] == 'default':
         test_prefs = np.array([[0, i, 0] for i in range(0, len(test_dataset))])# differs due to only needed for prediction
         return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
-    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
+    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
         return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
-    elif config['mode'] == 'fc' or config['mode'] == 'fc_extra' or config['mode'] == 'rank_mask':
+    elif config['mode'] == 'fc' or config['mode'] == 'fc_extra':
         train_dataset = transform_dataset_to_pair_dataset_torch(train_dataset, train_prefs, config)
         valid_dataset = transform_dataset_to_pair_dataset_torch(valid_dataset, valid_prefs, config)
         test_dataset = transform_dataset_to_pair_dataset_torch(test_dataset, test_prefs, config)

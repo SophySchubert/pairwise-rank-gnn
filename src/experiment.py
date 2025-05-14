@@ -34,9 +34,9 @@ if __name__ == '__main__':
     # Load + prep data
     if config['mode'] == 'nagsl_attention':
         config = config_add_nagsl(config)
-    if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
+    if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
-    elif config['mode'] == 'fc' or config['mode'] == 'fc_extra' or config['mode'] == 'rank_mask':
+    elif config['mode'] == 'fc' or config['mode'] == 'fc_extra':
         # Saving and loading of pickled data, to speedup the process if the same data is used
         if os.path.isfile(f"data/{config['data_name']}.pkl"):
             with open(f"data/{config['data_name']}.pkl", 'rb') as f:
@@ -57,7 +57,7 @@ if __name__ == '__main__':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
-    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention':
+    elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_prefs), shuffle=False, mode=config['mode'], config=config)
@@ -118,7 +118,7 @@ if __name__ == '__main__':
             state = {'epoch': epoch, 'state_dict': model.state_dict(),
                      'optimizer': optimizer.state_dict(), 'losslogger': criterion}
             torch.save(state, config['folder_path'] + f'/epoch{epoch}_state.pt')
-            if config['mode'] == 'default':
+            if config['mode'] == 'default' or config['mode'] == 'rank_mask':
                 predicted_pref, predicted_util = predict(model, test_loader_cached, device)
                 raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], predicted_pref))
                 cleaned_predictions = preprocess_predictions(raw_predictions_and_prefs)
@@ -143,7 +143,7 @@ if __name__ == '__main__':
 
     # test model with ranking prediction
     logger.info(f'Starting Prediction of ranking')
-    if config['mode'] == 'default':
+    if config['mode'] == 'default' or config['mode'] == 'rank_mask':
         predicted_pref, predicted_util = predict(model, test_loader_cached, device)
         raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], predicted_pref))
         cleaned_predictions = preprocess_predictions(raw_predictions_and_prefs)

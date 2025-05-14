@@ -30,7 +30,7 @@ class CustomDataLoader(DataLoader):
 
         idx_a, idx_b, target = zip(*[(x[0], x[1], x[2]) for x in batch])
         if self.mode == 'default':
-            data = self.get_data_from_indices(idx_a, idx_b, unique=False) # retrieve data from dataset
+            data = self.get_data_from_indices(idx_a, idx_b, unique=True) # retrieve data from dataset
             idx_a, idx_b = self.reindex_ids(idx_a, idx_b) # reindex ids to not get a out of bounds error in the NN
 
             # Create a DataBatch object
@@ -58,6 +58,14 @@ class CustomDataLoader(DataLoader):
             data_a = Batch.from_data_list(data_a)
             data_b = Batch.from_data_list(data_b)
             data_batch = nagsl_pair_attention_transform((data_a, data_b), torch.tensor(target), self.config)
+        elif self.mode == 'rank_mask':
+            combined, solo = transform_dataset_to_pair_dataset_torch(dataset=self.entire_dataset, prefs=batch, config=self.config, from_loader=True)
+            data_batch = Batch.from_data_list(combined)
+            data_batch_solo = Batch.from_data_list(solo)
+
+            data_batch.y = torch.tensor(target)
+            data_batch.solo_edge_index = data_batch_solo.edge_index
+            data_batch.solo_batch = data_batch_solo.batch
         else:
             raise ValueError(f"Unknown mode {self.mode}")
 
