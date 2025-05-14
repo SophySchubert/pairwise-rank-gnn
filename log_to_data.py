@@ -38,14 +38,16 @@ for exp in experiments:
 
         if not df.empty:
             df.to_pickle('dataframe.pkl')
+            df.interpolate(method='linear', inplace=True)
             df.plot(legend=True)
             plt.xlabel("Epochs")
             # plt.ylabel("Accuracy | Loss")
             # plt.savefig('plot.svg')
             # plt.close()
-            fig, ax1 = plt.subplots()
+            fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(12, 6))
 
             ax1.set_xlabel("Epochs")
+            ax1.set_title("Train/Valid Error and Accuracy")
             ax1.set_ylabel("Error")
             ax1.plot(df.index, df['Train Error'], label='Train Error', color='tab:blue')
             ax1.plot(df.index, df['Valid Error'], label='Valid Error', color='tab:orange')
@@ -57,8 +59,18 @@ for exp in experiments:
             ax2.plot(df.index, df['Valid Acc'], label='Valid Acc', color='tab:red')
             ax2.tick_params(axis='y')
 
+            handles_ax1, labels_ax1 = ax1.get_legend_handles_labels()
+            handles_ax2, labels_ax2 = ax2.get_legend_handles_labels()
+            ax1.legend(handles_ax1 + handles_ax2, labels_ax1 + labels_ax2, loc='upper left')
+
+            ax3.set_xlabel("Epochs")
+            ax3.set_ylabel("Kendall's Tau")
+            ax3.plot(df.index, df['tau'], label='Tau', color='tab:purple')
+            ax3.legend()
+            ax3.set_title("Kendall's Tau")
+
             fig.tight_layout()
-            fig.legend(loc='upper right', bbox_to_anchor=(1, 1), bbox_transform=ax1.transAxes)
-            plt.savefig('plot.svg')
+            # fig.legend(loc='upper right', bbox_to_anchor=(1, 1), bbox_transform=ax1.transAxes)
+            plt.savefig('plot.pdf', format='pdf')
             plt.close()
     os.chdir("..")
