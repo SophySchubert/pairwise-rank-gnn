@@ -14,3 +14,8 @@ Create or choose a config from src/config and run the experiment with:
 ```bash
   python src/experiment.py src/config/<CONFIG_NAME>.yml
 ```
+
+
+### Tutorial on how to change ogb api
+In your conda environemts there is a file \envs\<env_name>\Lib\site-packages\ogb\graphproppred\dataset_pyg.py 
+in line 68 you need to change the parameter from True to False.

@@ -293,8 +293,8 @@ class RANet(torch.nn.Module):
         x = F.tanh(x)
         # Attention block start
         q_mlp, k_mlp, v_mlp = self.qkv_mlps[0][0], self.qkv_mlps[0][1], self.qkv_mlps[0][2]
-        a_q = torch.ones(x.shape[0], x.shape[1], device=self.device)#q_mlp(x)
-        a_k = torch.ones(x.shape[0], x.shape[1], device=self.device)#k_mlp(x)
+        a_q = q_mlp(x)#torch.ones(x.shape[0], x.shape[1], device=self.device)#q_mlp(x)
+        a_k = k_mlp(x)#torch.ones(x.shape[0], x.shape[1], device=self.device)#k_mlp(x)
         a_v = v_mlp(x)
         x = flex_attention(query=a_q.unsqueeze(0).unsqueeze(0),
                            key=a_k.unsqueeze(0).unsqueeze(0),
@@ -341,17 +341,21 @@ class RANet(torch.nn.Module):
             the different graphs but of the same pair.
         """
         def doc_mask_mod(b, h, q_idx, kv_idx):
+            if self.config['attention'] == 'cross':
             # calculates a mask mod that only is True in areas where the connection between graphs is.
             # The rest is False
-            diff_graph = (document_id[q_idx] != document_id[kv_idx]) # the first pair
-            operation = False
-            for i in range(0, unique, 2):
-                # all following pair id combinations are calculated in this loop
-                operation = operation | (((document_id[q_idx] == i) & (document_id[kv_idx] == i+1)) | (
-                            (document_id[q_idx] == i+1) & (document_id[kv_idx] == i)))
-            inner_mask = noop_mask(b, h, q_idx, kv_idx) # simple noop_mask
-            # same_graph = (document_id[q_idx] == document_id[kv_idx])
-
-            return diff_graph & operation & inner_mask # combine all 3 masks
+                diff_graph = (document_id[q_idx] != document_id[kv_idx]) # the first pair
+                operation = False
+                for i in range(0, unique, 2):
+                    # all following pair id combinations are calculated in this loop
+                    operation = operation | (((document_id[q_idx] == i) & (document_id[kv_idx] == i+1)) | (
+                                (document_id[q_idx] == i+1) & (document_id[kv_idx] == i)))
+                inner_mask = noop_mask(b, h, q_idx, kv_idx) # simple noop_mask
+                return diff_graph & operation & inner_mask # combine all 3 masks
+            elif self.config['attention'] == 'self':
+                same_graph = (document_id[q_idx] == document_id[kv_idx])
+                return same_graph
+            else:
+                raise ValueError(f"Unknown attention type: {self.config['attention']}")
 
         return doc_mask_mod
