@@ -14,7 +14,10 @@ Create or choose a config from src/config and run the experiment with:
 ```bash
   python src/experiment.py src/config/<CONFIG_NAME>.yml
 ```
-
+To restart a previously stopped experiment, do:
+```bash
+  python src/experiment.py experiment/<experiment-path>/config.yml experiment/<experiment-path>/epoch<epoch-number>_state.pt
+```
 
 ### Tutorial on how to change ogb api
 In your conda environemts there is a file \envs\<env_name>\Lib\site-packages\ogb\graphproppred\dataset_pyg.py 

@@ -9,7 +9,7 @@ import pickle
 import os.path
 from random import shuffle
 
-from misc import setup_experiment, setup_logger, config_add_nagsl
+from misc import setup_experiment, setup_logger, config_add_nagsl, _read_config
 from data.load import get_data
 from data.loader import CustomDataLoader
 from models.torch_gnn import RankGNN, RankGAT, PairRankGNN, PairRankGNN2, RANet
@@ -20,13 +20,24 @@ if __name__ == '__main__':
     start_time = datetime.now()
     ######################################################################
     # CONFIG + SETUP
-    config = setup_experiment(sys.argv[1])
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if len(sys.argv) == 2:
+        config = setup_experiment(sys.argv[1])
+        config['start_epoch'] = 0
+    else:
+        config = _read_config(sys.argv[1])
+        config['folder_path'] = "./" + "/".join(sys.argv[2].split("/")[:-1])
+        state_dict = torch.load(sys.argv[2], map_location=device)
+        config['start_epoch'] = state_dict['epoch'] + 1
+
     config['device'] = device
 
     logger = setup_logger(config['folder_path'], lvl=config['logger']['level'])
     copyfile('src/models/torch_gnn.py', config['folder_path']+'/torch_gnn.py')
-    logger.info(f'Starting at {start_time}')
+    if len(sys.argv) == 2:
+        logger.info(f'Starting at {start_time}')
+    else:
+        logger.info(f'Restarting training at {start_time} - Epoch number {config['start_epoch']} ')
 
     seed_everything(config['seed']) # set seed for reproducibility
     ######################################################################
@@ -81,9 +92,17 @@ if __name__ == '__main__':
         model = NAGSLNet(config)
     elif config['mode'] == 'rank_mask':
         model = RANet(num_node_features=config['num_node_features'], device=device, config=config)
-    model = model.to(device)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
     criterion = torch.nn.BCELoss()
+
+    if len(sys.argv) > 2:
+        # Load model state
+        model.load_state_dict(state_dict['state_dict'])
+        optimizer.load_state_dict(state_dict['optimizer'])
+        criterion = state_dict['losslogger']
+
+    model = model.to(device)
     torch.compile(model, backend="cudagraphs")
 
     # Cache the DataLoader to speed up training
@@ -101,7 +120,7 @@ if __name__ == '__main__':
     training_start_time = datetime.now()
 
     # Training loop
-    for epoch in range(config['epochs']):
+    for epoch in range(config['start_epoch'], config['epochs']):
         # shuffle cached dataloader
         shuffle(train_loader_cached)
         shuffle(valid_loader_cached)
