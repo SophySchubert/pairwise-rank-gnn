@@ -37,7 +37,7 @@ if __name__ == '__main__':
     if len(sys.argv) == 2:
         logger.info(f'Starting at {start_time}')
     else:
-        logger.info(f'Restarting training at {start_time} - Epoch number {config['start_epoch']} ')
+        logger.info(f'Restarting training at {start_time} - Epoch number {config["start_epoch"]} ')
 
     seed_everything(config['seed']) # set seed for reproducibility
     ######################################################################
@@ -72,7 +72,7 @@ if __name__ == '__main__':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_prefs), shuffle=False, mode=config['mode'], config=config)
-    else:# fc, fc_extra, rank_mask # or config['mode'] == 'rank_mask'
+    else:# fc, fc_extra, rank_mask
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
