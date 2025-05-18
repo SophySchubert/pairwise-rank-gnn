@@ -3,7 +3,7 @@ from ogb.graphproppred import PygGraphPropPredDataset
 from torch_geometric.datasets import ZINC
 import numpy as np
 
-from data.misc import sample_preference_pairs, rank_data, transform_dataset_to_pair_dataset, transform_dataset_to_pair_dataset_torch
+from data.misc import sample_preference_pairs, rank_data, transform_dataset_to_pair_dataset, transform_dataset_to_pair_dataset_torch, sample_as_pairs, sample_transitivity_pairs
 
 def _ogb_available_datasets():
     '''List of datasets from OGB that are supported by this code'''
@@ -46,17 +46,22 @@ def get_data(config):
     test_prefs = sample_preference_pairs(test_dataset)
     # create test ranking
     test_ranking = rank_data([g.y.item() for g in test_dataset])
+    # properties set
+    antisymmetry_prefs = sample_as_pairs(test_prefs)
+    transitivity_prefs = sample_transitivity_pairs(test_ranking)
 
     # create pairs and targets
     if config['mode'] == 'default':
         test_prefs = np.array([[0, i, 0] for i in range(0, len(test_dataset))])# differs due to only needed for prediction
-        return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
+        return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking, antisymmetry_prefs, transitivity_prefs
     elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
-        return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking
+        return train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking, antisymmetry_prefs, transitivity_prefs
     elif config['mode'] == 'fc' or config['mode'] == 'fc_extra':
         train_dataset = transform_dataset_to_pair_dataset_torch(train_dataset, train_prefs, config)
         valid_dataset = transform_dataset_to_pair_dataset_torch(valid_dataset, valid_prefs, config)
         test_dataset = transform_dataset_to_pair_dataset_torch(test_dataset, test_prefs, config)
-        return train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking
+        as_dataset = transform_dataset_to_pair_dataset_torch(test_dataset, antisymmetry_prefs, config)
+        trans_dataset = transform_dataset_to_pair_dataset_torch(test_dataset, transitivity_prefs, config)
+        return train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking, as_dataset, trans_dataset
     else:
         raise ValueError(f'Unknown mode {config["mode"]}')

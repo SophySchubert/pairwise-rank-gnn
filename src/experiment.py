@@ -14,7 +14,7 @@ from data.load import get_data
 from data.loader import CustomDataLoader
 from models.torch_gnn import RankGNN, RankGAT, PairRankGNN, PairRankGNN2, RANet
 from models.NAGSL.NAGSL import NAGSLNet
-from data.misc import compare_rankings_with_kendalltau, rank_data, train, evaluate, predict, preprocess_predictions, retrieve_preference_counts_from_predictions
+from data.misc import compare_rankings_with_kendalltau, rank_data, train, evaluate, predict, preprocess_predictions, retrieve_preference_counts_from_predictions, check_trans, check_antisymetry
 
 if __name__ == '__main__':
     start_time = datetime.now()
@@ -46,16 +46,16 @@ if __name__ == '__main__':
     if config['mode'] == 'nagsl_attention':
         config = config_add_nagsl(config)
     if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
-        train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking = get_data(config)
+        train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking, antisymmetry_prefs, transitivity_prefs = get_data(config)
     elif config['mode'] == 'fc' or config['mode'] == 'fc_extra':
         # Saving and loading of pickled data, to speedup the process if the same data is used
         if os.path.isfile(f"data/{config['data_name']}.pkl"):
             with open(f"data/{config['data_name']}.pkl", 'rb') as f:
-                train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking, config['num_node_features'], config['max_num_nodes'] = pickle.load(f)
+                train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking, as_dataset, trans_dataset, config['num_node_features'], config['max_num_nodes'] = pickle.load(f)
         else:
-            train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking = get_data(config)
+            train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking, as_dataset, trans_dataset = get_data(config)
             with open(config['folder_path']+f"/{config['data_name']}.pkl", 'wb') as f:
-                 pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking, config['num_node_features'], config['max_num_nodes']), f)
+                 pickle.dump((train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking, as_dataset, trans_dataset, config['num_node_features'], config['max_num_nodes']), f)
     else:
         raise ValueError(f'Unknown mode {config["mode"]}')
     logger.info(f'Config: {config}')
@@ -104,6 +104,24 @@ if __name__ == '__main__':
 
     model = model.to(device)
     torch.compile(model, backend="cudagraphs")
+
+    if sys.argv[3] == 'condition':
+        # evaluate model on ranking properties
+        if config['mode'] == 'default':
+            as_loader = CustomDataLoader(antisymmetry_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
+            trans_loader = CustomDataLoader(transitivity_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
+        elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
+            as_loader = CustomDataLoader(antisymmetry_prefs, test_dataset, batch_size=len(antisymmetry_prefs), shuffle=False, mode=config['mode'], config=config)
+            trans_loader = CustomDataLoader(transitivity_prefs, test_dataset, batch_size=len(transitivity_prefs), shuffle=False, mode=config['mode'], config=config)
+        else:
+            as_loader = DataLoader(as_dataset, batch_size=len(as_dataset), shuffle=False)
+            trans_loader = DataLoader(trans_dataset, batch_size=len(trans_dataset), shuffle=False)
+
+        as_result = check_antisymetry(model, as_loader, device, antisymmetry_prefs, config['mode'])
+        trans_result = check_trans(model, trans_loader, device, config['mode'])
+        logger.info(f' Antisymmetry-Score: {as_result:.4f}, Transitivity-Score: {trans_result:.4f}')
+        sys.exit()
+
 
     # Cache the DataLoader to speed up training
     train_loader_cached = []

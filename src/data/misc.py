@@ -30,6 +30,23 @@ def check_util(data, index_a, index_b):
     else:
         return 0
 
+def sample_as_pairs(triplet):
+    pairs = []
+    for elem in triplet:
+        a, b, t  = elem[0], elem[1], elem[2]
+        if t == 0:
+            pairs.append([b, a, 1])
+        else:
+            pairs.append([b,a, 0])
+        pairs.append([a,b,t])
+    return pairs
+
+def sample_transitivity_pairs(ranking):
+    tuples = list(combinations(ranking, 2))
+    pairs = list(list(t) for t in tuples)
+    return pairs
+
+
 def rank_data(items):
     '''
     Wrapper for rankdata from scipy.stats, with method='dense'
@@ -130,6 +147,65 @@ def predict(model, loader, device, mode='default'):
                 util = None
                 pref = pref.detach().cpu().numpy()
     return pref, util
+
+def check_trans(model, loader, device, mode='default'):
+    # Check-condition for the model
+    model.eval()
+    with torch.no_grad():
+        for data in loader:
+            if mode == 'default' or mode == 'fc_extra' or mode == 'fc' or mode == 'rank_mask':
+                data = data.to(device)
+            elif mode == 'nagsl_attention':
+                data = data  # already on device
+            else:#gat_attention
+                tmp_0 = data[0].to(device)
+                tmp_1 = data[1].to(device)
+                data = [tmp_0, tmp_1]
+
+            if mode == 'default' or mode == 'rank_mask':
+                pref, util = model(data)
+                pref = (pref >= 0.5).float()
+                pref = pref.detach().cpu().numpy()
+            else:#gat_attention, nagsl_attention, fc_extra, fc
+                pref = model(data)
+                pref = (pref >= 0.5).float()
+                pref = pref.detach().cpu().numpy()
+
+        counted_ones = pref.count(1)
+        percentage = (counted_ones / len(pref)) * 100
+    return percentage
+
+def check_antisymetry(model, loader, device, antisymmetry_prefs, mode='default'):
+    # Check-condition for the model
+    model.eval()
+    with torch.no_grad():
+        for data in loader:
+            if mode == 'default' or mode == 'fc_extra' or mode == 'fc' or mode == 'rank_mask':
+                data = data.to(device)
+            elif mode == 'nagsl_attention':
+                data = data  # already on device
+            else:#gat_attention
+                tmp_0 = data[0].to(device)
+                tmp_1 = data[1].to(device)
+                data = [tmp_0, tmp_1]
+
+            if mode == 'default' or mode == 'rank_mask':
+                pref, util = model(data)
+                pref = (pref >= 0.5).float()
+                pref = pref.detach().cpu().numpy()
+            else:#gat_attention, nagsl_attention, fc_extra, fc
+                pref = model(data)
+                pref = (pref >= 0.5).float()
+                # pref = pref.detach().cpu().numpy()
+
+        y = [item[-1] for item in antisymmetry_prefs]
+        y = torch.tensor(y).to(device)
+        correct += (pref == y).sum().item()
+        total += y.size(0)
+
+        accuracy = correct / total
+    return accuracy
+
 
 def convert_torch_to_nx(graph):
     '''
