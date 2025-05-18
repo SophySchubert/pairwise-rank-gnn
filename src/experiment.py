@@ -105,7 +105,7 @@ if __name__ == '__main__':
     model = model.to(device)
     torch.compile(model, backend="cudagraphs")
 
-    if sys.argv[3] == 'condition':
+    if len(sys.argv) > 4 and sys.argv[3] == 'condition':
         # evaluate model on ranking properties
         if config['mode'] == 'default':
             as_loader = CustomDataLoader(antisymmetry_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
@@ -121,6 +121,8 @@ if __name__ == '__main__':
         trans_result = check_trans(model, trans_loader, device, config['mode'])
         logger.info(f' Antisymmetry-Score: {as_result:.4f}, Transitivity-Score: {trans_result:.4f}')
         sys.exit()
+    else:
+        pass
 
 
     # Cache the DataLoader to speed up training

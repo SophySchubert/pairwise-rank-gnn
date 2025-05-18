@@ -14,6 +14,7 @@ model_layers: 2
 model_dropout: 0.5
 dataset: ogbg-molfreesolv
 mode: fc
+attention: self
 bidirectional: True
 new_grap_edge_value:
   - 0

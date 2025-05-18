@@ -3,8 +3,8 @@ folder_path: experiment
 logger:
   level: 10 # CRITICAL = 50, ERROR = 40, WARNING = 30, INFO = 20, DEBUG = 10, NOTSET = 0
   format: "%(asctime)s - %(levelname)s - %(message)s"
-seed: 42
-logging_inverval: 5
+seed: 44
+logging_interval: 5
 epochs: 201
 batch_size: 512
 learning_rate: 0.001
@@ -14,8 +14,9 @@ model_layers: 2
 model_dropout: 0.5
 dataset: ogbg-molfreesolv
 mode: fc_extra
+attention: self
 bidirectional: True
-new_grap_edge_value:
+new_graph_edge_value:
   - 0
   - 0
   - 0

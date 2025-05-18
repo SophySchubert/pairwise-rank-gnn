@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch.nn import Linear, Sequential, ReLU, ModuleList
-# from torch.nn.attention.flex_attention import flex_attention, create_block_mask, _mask_mod_signature, noop_mask
+from torch.nn.attention.flex_attention import flex_attention, create_block_mask, _mask_mod_signature, noop_mask
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, EdgeConv
 import numpy as np
 '''
@@ -285,21 +285,21 @@ class RANet(torch.nn.Module):
     def forward(self, data):
         x, edge_index, batch, num_nodes_g_1, num_nodes_g_2, solo_edge_index, solo_batch = data.x, data.edge_index, data.batch, data.g_1, data.g_2, data.solo_edge_index, data.solo_batch
         document_id = self.create_documen_id(num_nodes_g_1, num_nodes_g_2)
-        # causal_mask = self.generate_doc_mask_mod(document_id, len(num_nodes_g_1))
-        # ranking_mask = create_block_mask(mask_mod=causal_mask, B=1, H=1, Q_LEN=x.shape[0], KV_LEN=x.shape[0], device=self.device)
+        causal_mask = self.generate_doc_mask_mod(document_id, len(num_nodes_g_1))
+        ranking_mask = create_block_mask(mask_mod=causal_mask, B=1, H=1, Q_LEN=x.shape[0], KV_LEN=x.shape[0], device=self.device)
         x = x.type(torch.FloatTensor).to(self.device)
 
         x = self.convIn(x, edge_index)
         x = F.tanh(x)
         # Attention block start
-        # q_mlp, k_mlp, v_mlp = self.qkv_mlps[0][0], self.qkv_mlps[0][1], self.qkv_mlps[0][2]
-        # a_q = q_mlp(x)#torch.ones(x.shape[0], x.shape[1], device=self.device)#q_mlp(x)
-        # a_k = k_mlp(x)#torch.ones(x.shape[0], x.shape[1], device=self.device)#k_mlp(x)
-        # a_v = v_mlp(x)
-        # x = flex_attention(query=a_q.unsqueeze(0).unsqueeze(0),
-        #                    key=a_k.unsqueeze(0).unsqueeze(0),
-        #                    value=a_v.unsqueeze(0).unsqueeze(0),
-        #                    block_mask=ranking_mask).squeeze(0).squeeze(0)
+        q_mlp, k_mlp, v_mlp = self.qkv_mlps[0][0], self.qkv_mlps[0][1], self.qkv_mlps[0][2]
+        a_q = q_mlp(x)#torch.ones(x.shape[0], x.shape[1], device=self.device)#q_mlp(x)
+        a_k = k_mlp(x)#torch.ones(x.shape[0], x.shape[1], device=self.device)#k_mlp(x)
+        a_v = v_mlp(x)
+        x = flex_attention(query=a_q.unsqueeze(0).unsqueeze(0),
+                           key=a_k.unsqueeze(0).unsqueeze(0),
+                           value=a_v.unsqueeze(0).unsqueeze(0),
+                           block_mask=ranking_mask).squeeze(0).squeeze(0)
         # Attention block end
         for i in range(self.config['model_layers'] - 1):
             x = self.convs[i](x, edge_index)
@@ -331,37 +331,37 @@ class RANet(torch.nn.Module):
         out = F.sigmoid(out) # Last activation to squash the output to [0,1]
         return out, x_util
 
-    # def generate_doc_mask_mod(self, document_id: torch.Tensor, unique: int) -> _mask_mod_signature:
-    #     """Generates mask mods that apply to inputs to flex attention in the sequence stacked
-    #     format.
-    #
-    #     Args:
-    #         docment_id: A tensor that contains a unique id for each graph and has the length of the number of nodes in the graph-batch. Each id has the
-    #                     length of the number of nodes in the graph.
-    #         unique: The number of unique document ids in the batch. This is the number of graphs in the batch and original batch size.
-    #
-    #     Note:
-    #         What is the sequence stacked format? When assembling batches of inputs, we
-    #         take multiple sequences and stack them together to form 1 large sequence. We then
-    #         use masking to ensure that the attention scores are only applied to tokens within
-    #         the different graphs but of the same pair.
-    #     """
-    #     def doc_mask_mod(b, h, q_idx, kv_idx):
-    #         if self.config['attention'] == 'cross':
-    #         # calculates a mask mod that only is True in areas where the connection between graphs is.
-    #         # The rest is False
-    #             diff_graph = (document_id[q_idx] != document_id[kv_idx]) # the first pair
-    #             operation = False
-    #             for i in range(0, unique, 2):
-    #                 # all following pair id combinations are calculated in this loop
-    #                 operation = operation | (((document_id[q_idx] == i) & (document_id[kv_idx] == i+1)) | (
-    #                             (document_id[q_idx] == i+1) & (document_id[kv_idx] == i)))
-    #             inner_mask = noop_mask(b, h, q_idx, kv_idx) # simple noop_mask
-    #             return diff_graph & operation & inner_mask # combine all 3 masks
-    #         elif self.config['attention'] == 'self':
-    #             same_graph = (document_id[q_idx] == document_id[kv_idx])
-    #             return same_graph
-    #         else:
-    #             raise ValueError(f"Unknown attention type: {self.config['attention']}")
-    #
-    #     return doc_mask_mod
+    def generate_doc_mask_mod(self, document_id: torch.Tensor, unique: int) -> _mask_mod_signature:
+        """Generates mask mods that apply to inputs to flex attention in the sequence stacked
+        format.
+
+        Args:
+            docment_id: A tensor that contains a unique id for each graph and has the length of the number of nodes in the graph-batch. Each id has the
+                        length of the number of nodes in the graph.
+            unique: The number of unique document ids in the batch. This is the number of graphs in the batch and original batch size.
+
+        Note:
+            What is the sequence stacked format? When assembling batches of inputs, we
+            take multiple sequences and stack them together to form 1 large sequence. We then
+            use masking to ensure that the attention scores are only applied to tokens within
+            the different graphs but of the same pair.
+        """
+        def doc_mask_mod(b, h, q_idx, kv_idx):
+            if self.config['attention'] == 'cross':
+            # calculates a mask mod that only is True in areas where the connection between graphs is.
+            # The rest is False
+                diff_graph = (document_id[q_idx] != document_id[kv_idx]) # the first pair
+                operation = False
+                for i in range(0, unique, 2):
+                    # all following pair id combinations are calculated in this loop
+                    operation |= (((document_id[q_idx] == i) & (document_id[kv_idx] == i+1)) | (
+                                (document_id[q_idx] == i+1) & (document_id[kv_idx] == i)))
+                inner_mask = noop_mask(b, h, q_idx, kv_idx) # simple noop_mask
+                return diff_graph & operation & inner_mask # combine all 3 masks
+            elif self.config['attention'] == 'self':
+                same_graph = (document_id[q_idx] == document_id[kv_idx])
+                return same_graph
+            else:
+                raise ValueError(f"Unknown attention type: {self.config['attention']}")
+
+        return doc_mask_mod

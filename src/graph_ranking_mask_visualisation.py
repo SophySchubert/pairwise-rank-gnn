@@ -50,15 +50,24 @@ def generate_doc_mask_mod(mask_mod: _mask_mod_signature, offsets: Tensor) -> _ma
     document_id = torch.tensor([0,0,0,1,1,1,1,2,2,2,3,3,3,4,4,5,5,5])#_offsets_to_doc_ids_tensor(offsets)
     unique = torch.unique(document_id)
     def doc_mask_mod(b, h, q_idx, kv_idx):
+        # dif_doc = (document_id[q_idx] != document_id[kv_idx])
+        # same_doc = document_id[q_idx] == document_id[kv_idx]
+        # operation = False
+        # for i in range(0, unique.size(dim=0), 2):
+        #     operation |= (((document_id[q_idx] == unique[i]) & (document_id[kv_idx] == unique[i + 1])) | (
+        #                 (document_id[q_idx] == unique[i + 1]) & (document_id[kv_idx] == unique[i])))
+        # inner_mask = noop_mask(b, h, q_idx, kv_idx)
+        # return dif_doc & operation & inner_mask
         dif_doc = (document_id[q_idx] != document_id[kv_idx])
         same_doc = document_id[q_idx] == document_id[kv_idx]
-        operation = False
-        for i in range(0, len(unique), 2):
-            operation = operation | (((document_id[q_idx] == unique[i]) & (document_id[kv_idx] == unique[i + 1])) | (
-                        (document_id[q_idx] == unique[i + 1]) & (document_id[kv_idx] == unique[i])))
-        inner_mask = noop_mask(b, h, q_idx, kv_idx)
+        operation = same_doc  # Startet mit True, wenn die Dokument-IDs gleich sind
 
-        return dif_doc & operation & inner_mask
+        for i in range(0, len(unique) - 1, 2):
+            operation |= ((document_id[q_idx] == unique[i]) & (document_id[kv_idx] == unique[i + 1])) | \
+                         ((document_id[q_idx] == unique[i + 1]) & (document_id[kv_idx] == unique[i]))
+
+        inner_mask = noop_mask(b, h, q_idx, kv_idx)
+        return operation & inner_mask
 
     return doc_mask_mod
 
@@ -108,7 +117,7 @@ def main(device: str = "cpu", causal: bool = True):
         key,
         mask_mod=document_causal_mask,
         device=device,
-        name="graph_ranking_mask",
+        name="asd",
     )
 
 
