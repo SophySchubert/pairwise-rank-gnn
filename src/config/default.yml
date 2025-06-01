@@ -13,8 +13,8 @@ model_units2: 32
 model_layers: 2 # >= 1
 model_dropout: 0.5
 dataset: ogbg-molfreesolv #JA: ogbg-molesol, ogbg-molfreesolv, ogbg-mollipo, ZINC
-mode: rank_mask # default, fc, fc_extra, gat_attention, nagsl_attention, rank_mask
-attention: combined # self, cross
+mode: default # default, fc, fc_extra, gat_attention, nagsl_attention, rank_mask
+attention: self # self, cross
 bidirectional: False
 new_graph_edge_value:
   - 0

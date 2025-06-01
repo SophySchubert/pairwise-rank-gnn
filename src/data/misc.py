@@ -37,7 +37,7 @@ def sample_as_pairs(triplet):
         if t == 0:
             pairs.append([b, a, 1])
         else:
-            pairs.append([b,a, 0])
+            pairs.append([b, a, 0])
         pairs.append([a,b,t])
     return pairs
 
@@ -165,45 +165,48 @@ def check_trans(model, loader, device, mode='default'):
             if mode == 'default' or mode == 'rank_mask':
                 pref, util = model(data)
                 pref = (pref >= 0.5).float()
-                pref = pref.detach().cpu().numpy()
+                pref = pref.detach().cpu().numpy().tolist()
             else:#gat_attention, nagsl_attention, fc_extra, fc
                 pref = model(data)
                 pref = (pref >= 0.5).float()
-                pref = pref.detach().cpu().numpy()
+                pref = pref.detach().cpu().numpy().tolist()
 
         counted_ones = pref.count(1)
         percentage = (counted_ones / len(pref)) * 100
+        print(data)
     return percentage
 
-def check_antisymetry(model, loader, device, antisymmetry_prefs, mode='default'):
+def check_antisymmetry(model, loader, device, mode='default'):
     # Check-condition for the model
     model.eval()
+    correct = 0
+    total = 0
     with torch.no_grad():
         for data in loader:
             if mode == 'default' or mode == 'fc_extra' or mode == 'fc' or mode == 'rank_mask':
                 data = data.to(device)
+                y = data.y
             elif mode == 'nagsl_attention':
-                data = data  # already on device
+                data = data #already on device
+                y = data['target']
             else:#gat_attention
                 tmp_0 = data[0].to(device)
                 tmp_1 = data[1].to(device)
                 data = [tmp_0, tmp_1]
+                y = data[0].y
 
             if mode == 'default' or mode == 'rank_mask':
                 pref, util = model(data)
-                pref = (pref >= 0.5).float()
-                pref = pref.detach().cpu().numpy()
-            else:#gat_attention, nagsl_attention, fc_extra, fc
-                pref = model(data)
-                pref = (pref >= 0.5).float()
-                # pref = pref.detach().cpu().numpy()
+            else:
+                pref = model(data).squeeze()
 
-        y = [item[-1] for item in antisymmetry_prefs]
-        y = torch.tensor(y).to(device)
-        correct += (pref == y).sum().item()
-        total += y.size(0)
+            #calc accuracy
+            predicted = (pref >= 0.5).float()
+            correct += (predicted == y).sum().item()
+            total += y.size(0)
 
-        accuracy = correct / total
+    accuracy = correct / total
+
     return accuracy
 
 
@@ -318,7 +321,6 @@ def transform_dataset_to_pair_dataset_torch(dataset, prefs, config, from_loader=
         if from_loader:
             _d.append(g_1)
             _d.append(g_2)
-        assert(combined_graph.y == pref[2])
         new_dataset.append(combined_graph)
     if from_loader:
         return new_dataset, _d

@@ -18,6 +18,10 @@ To restart a previously stopped experiment, do:
 ```bash
   python src/experiment.py experiment/<experiment-path>/config.yml experiment/<experiment-path>/epoch<epoch-number>_state.pt
 ```
+To test the transitivity and antisymmetry score of a model (after training), you can use the following command:
+```bash
+  python src/experiment.py experiment/<experiment-path>/config.yml experiment/<experiment-path>/epoch<epoch-number>_state.pt properties
+```
 
 ### Tutorial on how to change ogb api
 In your conda environemts there is a file \envs\<env_name>\Lib\site-packages\ogb\graphproppred\dataset_pyg.py 

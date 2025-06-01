@@ -14,7 +14,7 @@ from data.load import get_data
 from data.loader import CustomDataLoader
 from models.torch_gnn import RankGNN, RankGAT, PairRankGNN, PairRankGNN2, RANet
 from models.NAGSL.NAGSL import NAGSLNet
-from data.misc import compare_rankings_with_kendalltau, rank_data, train, evaluate, predict, preprocess_predictions, retrieve_preference_counts_from_predictions, check_trans, check_antisymetry
+from data.misc import compare_rankings_with_kendalltau, rank_data, train, evaluate, predict, preprocess_predictions, retrieve_preference_counts_from_predictions, check_trans, check_antisymmetry
 
 if __name__ == '__main__':
     start_time = datetime.now()
@@ -25,6 +25,7 @@ if __name__ == '__main__':
         config = setup_experiment(sys.argv[1])
         config['start_epoch'] = 0
     else:
+        torch.serialization.add_safe_globals([torch.nn.BCELoss])
         config = _read_config(sys.argv[1])
         config['folder_path'] = "./" + "/".join(sys.argv[2].split("/")[:-1])
         state_dict = torch.load(sys.argv[2], map_location=device)
@@ -33,9 +34,12 @@ if __name__ == '__main__':
     config['device'] = device
 
     logger = setup_logger(config['folder_path'], lvl=config['logger']['level'])
-    copyfile('src/models/torch_gnn.py', config['folder_path']+'/torch_gnn.py')
     if len(sys.argv) == 2:
+        # only save torch_gnn.py if it is a new experiment
+        copyfile('src/models/torch_gnn.py', config['folder_path']+'/torch_gnn.py')
         logger.info(f'Starting at {start_time}')
+    if len(sys.argv) == 4:
+        logger.info(f'Evaluating Properties of Transitivity and Antisymmetry {start_time}')
     else:
         logger.info(f'Restarting training at {start_time} - Epoch number {config["start_epoch"]} ')
 
@@ -48,7 +52,7 @@ if __name__ == '__main__':
     if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking, antisymmetry_prefs, transitivity_prefs = get_data(config)
     elif config['mode'] == 'fc' or config['mode'] == 'fc_extra':
-        # Saving and loading of pickled data, to speedup the process if the same data is used
+        # Saving and loading of pickled data, to speed up the process if the same data is used
         if os.path.isfile(f"data/{config['data_name']}.pkl"):
             with open(f"data/{config['data_name']}.pkl", 'rb') as f:
                 train_dataset, valid_dataset, test_dataset, test_prefs, test_ranking, as_dataset, trans_dataset, config['num_node_features'], config['max_num_nodes'] = pickle.load(f)
@@ -72,7 +76,7 @@ if __name__ == '__main__':
         train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
         valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
         test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_prefs), shuffle=False, mode=config['mode'], config=config)
-    else:# fc, fc_extra, rank_mask
+    else:# fc, fc_extra
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
@@ -105,9 +109,12 @@ if __name__ == '__main__':
     model = model.to(device)
     torch.compile(model, backend="cudagraphs")
 
-    if len(sys.argv) > 4 and sys.argv[3] == 'condition':
+    if len(sys.argv) == 4:
         # evaluate model on ranking properties
         if config['mode'] == 'default':
+            print(len(transitivity_prefs))
+            print(len(antisymmetry_prefs))
+            print(len(test_dataset))
             as_loader = CustomDataLoader(antisymmetry_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
             trans_loader = CustomDataLoader(transitivity_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
         elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
@@ -117,12 +124,10 @@ if __name__ == '__main__':
             as_loader = DataLoader(as_dataset, batch_size=len(as_dataset), shuffle=False)
             trans_loader = DataLoader(trans_dataset, batch_size=len(trans_dataset), shuffle=False)
 
-        as_result = check_antisymetry(model, as_loader, device, antisymmetry_prefs, config['mode'])
         trans_result = check_trans(model, trans_loader, device, config['mode'])
+        as_result = check_antisymmetry(model, as_loader, device, config['mode'])
         logger.info(f' Antisymmetry-Score: {as_result:.4f}, Transitivity-Score: {trans_result:.4f}')
         sys.exit()
-    else:
-        pass
 
 
     # Cache the DataLoader to speed up training
