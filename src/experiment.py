@@ -25,7 +25,7 @@ if __name__ == '__main__':
         config = setup_experiment(sys.argv[1])
         config['start_epoch'] = 0
     else:
-        # torch.serialization.add_safe_globals([torch.nn.BCELoss])
+        torch.serialization.add_safe_globals([torch.nn.BCELoss])
         config = _read_config(sys.argv[1])
         config['folder_path'] = "./" + "/".join(sys.argv[2].split("/")[:-1])
         state_dict = torch.load(sys.argv[2], map_location=device)
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     # Load + prep data
     if config['mode'] == 'nagsl_attention':
         config = config_add_nagsl(config)
-    if config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
+    if (config['mode'] == 'default' or config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask'):
         train_dataset, valid_dataset, test_dataset, train_prefs, valid_prefs, test_prefs, test_ranking, antisymmetry_prefs, transitivity_prefs = get_data(config)
     elif config['mode'] == 'fc' or config['mode'] == 'fc_extra':
         # Saving and loading of pickled data, to speed up the process if the same data is used
@@ -69,13 +69,19 @@ if __name__ == '__main__':
 
     # DataLoaders
     if config['mode'] == 'default':
-        train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
-        valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
-        test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
+        train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'],
+                                        shuffle=True, mode=config['mode'], config=config)
+        valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'],
+                                        shuffle=False, mode=config['mode'], config=config)
+        test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_dataset),
+                                       shuffle=False, mode=config['mode'], config=config)
     elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
-        train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'], shuffle=True, mode=config['mode'], config=config)
-        valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'], shuffle=False, mode=config['mode'], config=config)
-        test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_prefs), shuffle=False, mode=config['mode'], config=config)
+        train_loader = CustomDataLoader(train_prefs,train_dataset, batch_size=config['batch_size'],
+                                        shuffle=True, mode=config['mode'], config=config)
+        valid_loader = CustomDataLoader(valid_prefs,valid_dataset, batch_size=config['batch_size'],
+                                        shuffle=False, mode=config['mode'], config=config)
+        test_loader = CustomDataLoader(test_prefs, test_dataset, batch_size=len(test_prefs),
+                                       shuffle=False, mode=config['mode'], config=config)
     else:# fc, fc_extra
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=False)
@@ -112,11 +118,15 @@ if __name__ == '__main__':
     if len(sys.argv) == 4:
         # evaluate model on ranking properties
         if config['mode'] == 'default':
-            as_loader = CustomDataLoader(antisymmetry_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
-            trans_loader = CustomDataLoader(transitivity_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
+            as_loader = CustomDataLoader(antisymmetry_prefs, test_dataset, batch_size=len(test_dataset),
+                                         shuffle=False, mode=config['mode'], config=config)
+            trans_loader = CustomDataLoader(transitivity_prefs, test_dataset, batch_size=len(test_dataset),
+                                            shuffle=False, mode=config['mode'], config=config)
         elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':
-            as_loader = CustomDataLoader(antisymmetry_prefs, test_dataset, batch_size=len(antisymmetry_prefs), shuffle=False, mode=config['mode'], config=config)
-            trans_loader = CustomDataLoader(transitivity_prefs, test_dataset, batch_size=len(transitivity_prefs), shuffle=False, mode=config['mode'], config=config)
+            as_loader = CustomDataLoader(antisymmetry_prefs, test_dataset, batch_size=len(antisymmetry_prefs),
+                                         shuffle=False, mode=config['mode'], config=config)
+            trans_loader = CustomDataLoader(transitivity_prefs, test_dataset, batch_size=len(transitivity_prefs),
+                                            shuffle=False, mode=config['mode'], config=config)
         else:
             as_loader = DataLoader(as_dataset, batch_size=len(as_dataset), shuffle=False)
             trans_loader = DataLoader(trans_dataset, batch_size=len(trans_dataset), shuffle=False)
@@ -152,7 +162,8 @@ if __name__ == '__main__':
         torch.cuda.empty_cache()
         valid_error, valid_acc = evaluate(model, valid_loader_cached, device, criterion, config['mode'])
         torch.cuda.empty_cache()
-        logger.info(f'Epoch: {epoch}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}, Train Acc: {test_acc:.4f}, Valid Acc: {valid_acc:.4f}')
+        logger.info(f'Epoch: {epoch}, Train Error: {train_error:.4f}, Valid Error: {valid_error:.4f}, '
+                    f'Train Acc: {test_acc:.4f}, Valid Acc: {valid_acc:.4f}')
         # save model and state every logging_interval epochs
         if epoch % config['logging_interval'] == 0:
             torch.save(model.state_dict(), config['folder_path'] + f'/epoch{epoch}_model.pt')
@@ -163,12 +174,14 @@ if __name__ == '__main__':
                 predicted_pref, predicted_util = predict(model, test_loader_cached, device)
                 raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], predicted_pref))
                 cleaned_predictions = preprocess_predictions(raw_predictions_and_prefs)
-                predicted_util = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs, max_range=len(test_ranking))
+                predicted_util = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs,
+                                                                             max_range=len(test_ranking))
             else:
                 predicted_pref, _ = predict(model, test_loader_cached, device, config['mode'])
                 raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], predicted_pref))
                 cleaned_predictions = preprocess_predictions(raw_predictions_and_prefs)
-                predicted_util = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs, max_range=len(test_ranking))
+                predicted_util = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs,
+                                                                             max_range=len(test_ranking))
 
             predicted_ranking = rank_data(predicted_util)
             logger.info(f'length of rankings is the same: {len(predicted_ranking) == len(test_ranking)}')
@@ -188,7 +201,8 @@ if __name__ == '__main__':
         predicted_pref, predicted_util = predict(model, test_loader_cached, device)
         raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], predicted_pref))
         cleaned_predictions = preprocess_predictions(raw_predictions_and_prefs)
-        predicted_util = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs, max_range=len(test_ranking))
+        predicted_util = retrieve_preference_counts_from_predictions(raw_predictions_and_prefs,
+                                                                     max_range=len(test_ranking))
     else:
         predicted_pref, _ = predict(model, test_loader_cached, device, config['mode'])
         raw_predictions_and_prefs = np.column_stack((test_prefs[:, :2], predicted_pref))

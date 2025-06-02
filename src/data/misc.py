@@ -46,7 +46,6 @@ def sample_transitivity_pairs(ranking):
     pairs = list((t[0], t[1], 1) for t in tuples)
     return np.array(pairs)
 
-
 def rank_data(items):
     '''
     Wrapper for rankdata from scipy.stats, with method='dense'
@@ -207,7 +206,6 @@ def check_antisymmetry(model, loader, device, mode='default'):
     accuracy = correct / total
 
     return accuracy
-
 
 def convert_torch_to_nx(graph):
     '''

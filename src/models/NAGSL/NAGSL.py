@@ -1,9 +1,8 @@
+"""Entire Code from https://github.com/AlbertTan404/NA-GSL/tree/main accessed on 2 June 2025"""
 import torch
-
 from models.NAGSL.EmbeddingLearning import GCNTransformerEncoder
 from models.NAGSL.EmbeddingInteraction import CrossTransformer
 from models.NAGSL.SimMatLearning import SimMatLearning
-
 
 class NAGSLNet(torch.nn.Module):
     def __init__(self, config):

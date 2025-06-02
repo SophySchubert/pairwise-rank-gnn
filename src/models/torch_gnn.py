@@ -4,6 +4,7 @@ from torch.nn import Linear, Sequential, ReLU, ModuleList
 from torch.nn.attention.flex_attention import flex_attention, create_block_mask, _mask_mod_signature, noop_mask
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, EdgeConv
 import numpy as np
+
 '''
 Graph Neural Networks
 '''

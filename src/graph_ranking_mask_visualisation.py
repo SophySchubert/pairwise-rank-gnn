@@ -1,7 +1,7 @@
 """Generates a document causal attention mask based on a document ID tensor"""
+"""Code from: https://github.com/pytorch-labs/attention-gym access on June 2 2025"""
 
 from typing import List, Union
-
 import torch
 from torch import Tensor
 from torch.nn.attention.flex_attention import _mask_mod_signature, noop_mask

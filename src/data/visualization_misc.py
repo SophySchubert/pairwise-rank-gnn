@@ -3,8 +3,9 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 '''
-Visualisation of a graph - not needed for the framework
+Visualisation of a graph - not needed nor used for the framework
 '''
+
 def vis(graph):
     '''
     Visualize a graph from TUDataset with Plotly
