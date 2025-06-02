@@ -25,7 +25,7 @@ if __name__ == '__main__':
         config = setup_experiment(sys.argv[1])
         config['start_epoch'] = 0
     else:
-        torch.serialization.add_safe_globals([torch.nn.BCELoss])
+        # torch.serialization.add_safe_globals([torch.nn.BCELoss])
         config = _read_config(sys.argv[1])
         config['folder_path'] = "./" + "/".join(sys.argv[2].split("/")[:-1])
         state_dict = torch.load(sys.argv[2], map_location=device)
@@ -112,9 +112,6 @@ if __name__ == '__main__':
     if len(sys.argv) == 4:
         # evaluate model on ranking properties
         if config['mode'] == 'default':
-            print(len(transitivity_prefs))
-            print(len(antisymmetry_prefs))
-            print(len(test_dataset))
             as_loader = CustomDataLoader(antisymmetry_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
             trans_loader = CustomDataLoader(transitivity_prefs, test_dataset, batch_size=len(test_dataset), shuffle=False, mode=config['mode'], config=config)
         elif config['mode'] == 'gat_attention' or config['mode'] == 'nagsl_attention' or config['mode'] == 'rank_mask':

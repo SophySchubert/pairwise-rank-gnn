@@ -39,12 +39,12 @@ def sample_as_pairs(triplet):
         else:
             pairs.append([b, a, 0])
         pairs.append([a,b,t])
-    return pairs
+    return np.array(pairs)
 
 def sample_transitivity_pairs(ranking):
     tuples = list(combinations(ranking, 2))
-    pairs = list(list(t) for t in tuples)
-    return pairs
+    pairs = list((t[0], t[1], 1) for t in tuples)
+    return np.array(pairs)
 
 
 def rank_data(items):
@@ -172,8 +172,7 @@ def check_trans(model, loader, device, mode='default'):
                 pref = pref.detach().cpu().numpy().tolist()
 
         counted_ones = pref.count(1)
-        percentage = (counted_ones / len(pref)) * 100
-        print(data)
+        percentage = (counted_ones / len(pref))
     return percentage
 
 def check_antisymmetry(model, loader, device, mode='default'):
