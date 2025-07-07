@@ -104,7 +104,7 @@ class RankGAT(torch.nn.Module):
         x_a = self.convIn(x_a, edge_index_a)
         x_a = F.tanh(x_a)
         for i in range(self.config['model_layers'] - 1):
-            x_a = self.convs[i](x_b, edge_index_a)
+            x_a = self.convs[i](x_a, edge_index_a)
             x_a = F.tanh(x_a)
             x_a = F.dropout(x_a, p=self.config['model_dropout'], training=self.training)
         x_a = self.fc1(x_a)

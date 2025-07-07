@@ -79,9 +79,7 @@ class CustomDataLoader(DataLoader):
             # Some methods do not need duplicates, pairs then get referenced by ids
             ids = np.unique(np.concatenate((idx_a, idx_b)))
         else:
-            ids = np.empty((len(idx_a) + len(idx_b)))
-            ids[0::2] = idx_a
-            ids[1::2] = idx_b
+            ids = idx_a
 
         required_data = [self.entire_dataset[int(i)] for i in ids]
         return required_data
